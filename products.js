@@ -54,11 +54,3 @@ const INVOICE_LUBRICANTS=[
  ['Avalon','3','0.5KG×12',6,6.70,40.20,'',null,'KG']
 ].map(([specification,grade,packSize,factor,fobUnit,fobPack,api,existing,unit='LTR'])=>({category:'Goodyear lubricants',sku:existing||('GY-'+specification+'-'+grade+'-'+packSize).toUpperCase().replace(/ /g,'-').replace(/×/g,'X').replace(/\./g,'P'),product:'Goodyear '+specification+'_'+grade+'_'+packSize,specification:'Goodyear '+specification,grade,packSize,unit,pack:String(factor),uom:'PACK',model:'Goodyear '+specification,api,invoiceReference:'2026-09-09',referenceFobUnitUSD:fobUnit,referenceFobPackUSD:fobPack,hs:unit==='KG'?'27101989':'27101931'}));
 INVOICE_LUBRICANTS.forEach(item=>{const prior=PRODUCT_DATASET.find(p=>p.sku===item.sku);if(prior){prior.product=item.product;prior.grade=item.grade;prior.packSize=item.packSize;prior.specification=item.specification;prior.api=item.api;prior.referenceFobUnitUSD=item.referenceFobUnitUSD;prior.referenceFobPackUSD=item.referenceFobPackUSD;prior.invoiceReference=item.invoiceReference}else PRODUCT_DATASET.push({...item,invoiceAddition:true,hsStatus:'Provisional — verify before customs use'})});
-const ItemCatalogHistory={
- key:'lc-invoice-catalog-history-v1',
- read(){const state=JSON.parse(localStorage.getItem(this.key)||'null');return state&&Array.isArray(state.states)&&Number.isInteger(state.cursor)&&state.cursor>=0&&state.cursor<state.states.length?state:{states:[false,true],cursor:1}},
- enabled(){const state=this.read();return state.states[state.cursor]},
- move(delta){const state=this.read(),cursor=state.cursor+delta;if(cursor<0||cursor>=state.states.length)return;localStorage.setItem(this.key,JSON.stringify({...state,cursor}));return this.enabled()}
-};
-const datasetWithInvoiceItems=getProductDataset;
-getProductDataset=function(){return datasetWithInvoiceItems().filter(p=>!p.invoiceAddition||ItemCatalogHistory.enabled())};
