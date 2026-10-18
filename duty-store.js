@@ -14,6 +14,8 @@ const DUTY_PARTIES=[{id:'DUTY-CTG',name:'Chattogram Customs House'},{id:'DUTY-MG
 const CNF_PARTIES=[{id:'CNF-001',name:'Sample C&F Agent — Chattogram'},{id:'CNF-002',name:'Sample C&F Agent — Mongla'},{id:'CNF-003',name:'Sample C&F Agent — Benapole'}];
 const DutyStore={
  key:'lc-duty-calculations-v1',
+ headConfigured(row,head){const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);return Boolean(cost?.included)&&cost.value!==''&&cost.value!==null&&Number.isFinite(Number(cost.value))&&Number.isFinite(Number(setup.calculation?.amounts?.[cost.id]??cost.value))},
+ validateConfiguredHeads(basis,result,old){for(const row of result.rows){const source=basis.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);for(const head of DUTY_HEADS){if(this.headConfigured(source,head))continue;const actual=row.heads[head.id].actual,previous=old?.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom)?.heads?.[head.id]?.actual;if(Number(actual)>0&&(!old||Number(previous)!==Number(actual)))throw Error(row.itemCode+': '+head.name+' is not configured in the saved LC standard. Cancel downstream entries in reverse order and cancel/recreate the LC opening to use a new standard.')}}},
  read(){const records=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(records))throw Error('Invalid duty calculation storage.');return records},
  round(v){return Math.round((v+Number.EPSILON)*100)/100},
  number(value,label){const n=Number(value);if(value===''||value===null||value===undefined||!Number.isFinite(n)||n<0)throw Error('Enter a non-negative '+label+'.');return n},
@@ -84,7 +86,7 @@ const DutyStore={
    if(!basis.rows.every(r=>r.standardSnapshot))throw Error('Saved standard cost snapshot is missing for one or more manifest items.');
   }
   if(input.header.boeDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(input.header.boeDate)||!Number.isFinite(Date.parse(input.header.boeDate+'T00:00:00Z'))||new Date(input.header.boeDate+'T00:00:00Z').toISOString().slice(0,10)!==input.header.boeDate||input.header.boeDate>date))throw Error('Bill of Entry date must be valid and no later than costing date.');
-  const result=this.calculate(basis,input.rows,input.header.rate);if(input.status==='Saved'&&result.totalActual===null)throw Error('Enter an actual value for every duty head. Enter 0 for heads that do not apply.');const now=new Date().toISOString();
+  const result=this.calculate(basis,input.rows,input.header.rate);this.validateConfiguredHeads(basis,result,old);if(input.status==='Saved'&&result.totalActual===null)throw Error('Enter an actual value for every duty head. Enter 0 for heads that do not apply.');const now=new Date().toISOString();
   const record={...input,...result,basis,portReceiptId:release.portReceiptId,manifestNumber:basis.manifestNumber,lcOpeningId:basis.lcOpeningId,id:input.id||crypto.randomUUID(),number:old?.number||'DUTY-'+String(records.reduce((max,r)=>Math.max(max,Number(String(r.number).replace('DUTY-',''))||0),0)+1).padStart(6,'0'),revision:(revision||0)+1,updatedAt:now,history:old?[...(old.history||[]),{action:'Modified',at:now,before:{header:old.header,rows:old.rows},after:{header:input.header,rows:result.rows}}]:[]};
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  }

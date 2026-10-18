@@ -41,8 +41,8 @@ function renderDuty(){
    });
    DUTY_HEADS.forEach(head=>{
     const cell=tr.querySelector('[data-head="'+head.id+'"]'),input=document.createElement('input');
-    input.type='number';input.min='0';input.step='0.01';input.value=row.heads[head.id].value;input.placeholder='Total BDT';input.disabled=locked;
-    input.setAttribute('aria-label',head.name+' total BDT for '+row.itemCode);input.title='Enter the total amount for this SKU in the manifest. Quantity is not multiplied again.';
+    input.type='number';input.min='0';input.step='0.01';input.value=row.heads[head.id].value;input.placeholder='Total BDT';input.disabled=locked||!DutyStore.headConfigured(source,head);
+    input.setAttribute('aria-label',head.name+' total BDT for '+row.itemCode);input.title=DutyStore.headConfigured(source,head)?'Enter the total amount for this SKU in the manifest. Quantity is not multiplied again.':'Not configured in the saved LC standard. Reverse downstream entries and cancel/recreate the LC opening to use a new standard.';
     input.oninput=()=>{row.heads[head.id].method='total';row.heads[head.id].value=input.value;dutyTotals()};cell.append(input);
    });dt('dutyRows').append(tr);
   });
