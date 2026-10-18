@@ -57,3 +57,6 @@ const INVOICE_LUBRICANTS=[
  ['Avalon','3','0.5KG×12',6,6.70,40.20,'',null,'KG']
 ].map(([specification,grade,packSize,factor,fobUnit,fobPack,api,existing,unit='LTR'])=>({category:'Goodyear lubricants',sku:existing||('GY-'+specification+'-'+grade+'-'+packSize).toUpperCase().replace(/ /g,'-').replace(/×/g,'X').replace(/\./g,'P'),product:'Goodyear '+specification+'_'+grade+'_'+packSize,specification:'Goodyear '+specification,grade,packSize,unit,pack:String(factor),uom:'PACK',model:'Goodyear '+specification,api,invoiceReference:'2026-09-09',referenceFobUnitUSD:fobUnit,referenceFobPackUSD:fobPack,hs:unit==='KG'?'27101989':'27101931'}));
 INVOICE_LUBRICANTS.forEach(item=>{const prior=PRODUCT_DATASET.find(p=>p.sku===item.sku);if(prior){prior.product=item.product;prior.grade=item.grade;prior.packSize=item.packSize;prior.specification=item.specification;prior.api=item.api;prior.referenceFobUnitUSD=item.referenceFobUnitUSD;prior.referenceFobPackUSD=item.referenceFobPackUSD;prior.invoiceReference=item.invoiceReference}else PRODUCT_DATASET.push({...item,invoiceAddition:true,hsStatus:'Provisional — verify before customs use'})});
+
+// User-selected shared SAMPLE code for the Bike category; not a customs classification.
+PRODUCT_DATASET.filter(item=>item.category==='Bike').forEach(item=>item.hs='87116000');
