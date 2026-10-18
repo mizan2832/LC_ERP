@@ -1,8 +1,8 @@
 // Demonstration item master. Confirm classifications against approved item data.
 const PRODUCT_DATASET = [
-  {category:'Bike',sku:'BIKE-ZS',product:'ZS',hs:'',unit:'PCS',pack:'1',uom:'PCS',model:'ZS',grade:'Standard',colour:'STANDARD'},
-  {category:'Bike',sku:'BIKE-ES-3',product:'ES-3',hs:'',unit:'PCS',pack:'1',uom:'PCS',model:'ES-3',grade:'Standard',colour:'STANDARD'},
-  {category:'Bike',sku:'BIKE-T60',product:'T60',hs:'',unit:'PCS',pack:'1',uom:'PCS',model:'T60',grade:'Standard',colour:'STANDARD'},
+  {category:'Bike',sku:'BIKE-ZS',product:'ZS',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'ZS',grade:'Standard',colour:'STANDARD'},
+  {category:'Bike',sku:'BIKE-ES-3',product:'ES-3',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'ES-3',grade:'Standard',colour:'STANDARD'},
+  {category:'Bike',sku:'BIKE-T60',product:'T60',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'T60',grade:'Standard',colour:'STANDARD'},
   {category:'Bike',sku:'EMAX-ES4',product:'Emax-ES4',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'Emax-ES4',grade:'Standard',colour:'STANDARD'},
   {category:'Bike',sku:'EMAX-F50',product:'Emax-F50',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'Emax-F50',grade:'Standard',colour:'STANDARD'},
   {category:'Bike',sku:'EMAX-E11',product:'Emax-E11',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'Emax-E11',grade:'Standard',colour:'STANDARD'},
