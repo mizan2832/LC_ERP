@@ -1,0 +1,94 @@
+// Keep calculation inputs and stable head IDs; show only chosen costing rows.
+const chosenStandardHeads=new Set();
+const standardHeadCatalog=new Map();
+function rememberStandardHeads(){
+ rows.forEach(row=>standardHeadCatalog.set(row.id,{...row}));
+ readStorage().forEach(setup=>(setup.costs||[]).forEach(row=>{
+  if(!standardHeadCatalog.has(row.id))standardHeadCatalog.set(row.id,{...row});
+ }));
+}
+function standardRowHasCost(row){return Boolean($('i-'+row.id)?.checked)&&Number($('v-'+row.id)?.value)>0}
+function standardRowVisible(row){if(/assembl/i.test(row.name))return false;return Boolean($('i-'+row.id)?.checked)&&(standardRowHasCost(row)||chosenStandardHeads.has(row.id))}
+function standardHeadChoices(key,currentId=''){
+ const names=new Set(),choices=[];
+ // Prefer the definitions already loaded in this setup when custom IDs differ.
+ [...rows,...standardHeadCatalog.values()].filter(row=>row.key===key&&!/assembl/i.test(row.name)).forEach(row=>{
+  const name=row.name.trim().toLowerCase();if(names.has(name))return;names.add(name);
+  const occupied=rows.some(other=>other.key===key&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
+  choices.push({...row,disabled:occupied});
+ });return choices;
+}
+function fillStandardHeadSelect(select,key,currentId=''){
+ select.replaceChildren(new Option('Select cost head…',''));
+ standardHeadChoices(key,currentId).forEach(row=>{const option=new Option(row.name,row.id);option.disabled=row.disabled;select.add(option)});
+ select.value=currentId;
+}
+function refreshStandardHeadSelects(){
+ document.querySelectorAll('[data-standard-head]').forEach(select=>fillStandardHeadSelect(select,select.dataset.group,select.dataset.standardHead));
+}
+function installStandardHeadSelect(row){
+ const tr=$('v-'+row.id)?.closest('tr');if(!tr||tr.querySelector('[data-standard-head]'))return;
+ const cell=tr.cells[0],hint=cell.querySelector('small');
+ const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=row.key;
+ select.setAttribute('aria-label','Cost head in '+row.key);fillStandardHeadSelect(select,row.key,row.id);
+ cell.replaceChildren(select);if(hint)cell.append(hint);
+ select.onchange=()=>{
+  const targetId=select.value;if(!targetId||targetId===row.id){select.value=row.id;return}
+  const target=standardHeadCatalog.get(targetId)||rows.find(r=>r.id===targetId);
+  if(!target||standardHeadChoices(row.key,row.id).find(r=>r.id===targetId)?.disabled){select.value=row.id;return}
+  const value=$('v-'+row.id).value,method=$('m-'+row.id).value,included=$('i-'+row.id).checked;
+  if(!rows.some(r=>r.id===targetId))addCostRow({...target,value:0,included:true});
+  $('v-'+targetId).value=value;$('m-'+targetId).value=method;$('i-'+targetId).checked=included;
+  $('v-'+row.id).value=0;$('i-'+row.id).checked=false;chosenStandardHeads.delete(row.id);chosenStandardHeads.add(targetId);
+  installStandardHeadSelect(rows.find(r=>r.id===targetId));calc();refreshStandardHeadSelects();showSetupStatus(currentSetupNumber?'Editing':'New');
+ };
+}
+function refreshStandardRowVisibility(){
+ rows.forEach(row=>{const tr=$('v-'+row.id)?.closest('tr');if(tr)tr.hidden=!standardRowVisible(row)});
+ groups.forEach(([key])=>{
+  const section=$('sub-'+key).parentElement,empty=section.querySelector('.empty-standard-heads');
+  if(empty)empty.hidden=rows.some(r=>r.key===key&&standardRowVisible(r))||Boolean(section.querySelector('.pending-standard-head'));
+ });
+}
+function resetStandardRowSelection(){
+ chosenStandardHeads.clear();document.querySelectorAll('.pending-standard-head').forEach(tr=>tr.remove());
+ rememberStandardHeads();rows.forEach(installStandardHeadSelect);refreshStandardRowVisibility();refreshStandardHeadSelects();
+}
+function addStandardCostRow(key){
+ const section=$('sub-'+key).parentElement,tr=document.createElement('tr');tr.className='pending-standard-head';
+ const cell=document.createElement('td'),select=document.createElement('select');select.dataset.standardHead='';select.dataset.group=key;select.setAttribute('aria-label','Select new cost head for '+key);fillStandardHeadSelect(select,key);cell.append(select);tr.append(cell);
+ for(let i=0;i<4;i++){const td=document.createElement('td');td.textContent=i===0?'Select a cost head first':'';tr.append(td)}
+ section.querySelector('tbody').append(tr);refreshStandardRowVisibility();select.focus();
+ select.onchange=()=>{
+  const id=select.value,target=standardHeadCatalog.get(id)||rows.find(r=>r.id===id);
+  if(!target||standardHeadChoices(key).find(r=>r.id===id)?.disabled)return;
+  if(!rows.some(r=>r.id===id))addCostRow({...target,method:'fixed',value:0,included:true});
+  chosenStandardHeads.add(id);$('i-'+id).checked=true;tr.remove();installStandardHeadSelect(rows.find(r=>r.id===id));calc();refreshStandardHeadSelects();$('v-'+id).focus();showSetupStatus(currentSetupNumber?'Editing':'New');
+ };
+}
+rememberStandardHeads();
+groups.forEach(([key])=>{
+ const section=$('sub-'+key).parentElement,head=section.querySelector('.sectionhead');
+ const add=document.createElement('button');add.type='button';add.textContent='+ Add Row';add.onclick=()=>addStandardCostRow(key);head.append(add);
+ const empty=document.createElement('p');empty.className='empty-standard-heads muted';empty.textContent='No costing rows selected. Click Add Row to choose a cost head.';section.insertBefore(empty,$('sub-'+key));
+ const oldControls=section.querySelector('.addhead');
+ if(oldControls){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Create a new cost head';details.className='create-standard-head';details.append(summary);oldControls.before(details);details.append(oldControls);
+  const button=oldControls.querySelector('button'),original=button.onclick;
+  button.onclick=()=>{const before=new Set(rows.map(r=>r.id));original();rows.filter(r=>!before.has(r.id)).forEach(r=>{chosenStandardHeads.add(r.id);standardHeadCatalog.set(r.id,{...r});installStandardHeadSelect(r)});calc();refreshStandardHeadSelects()};
+ }
+});
+const calculateBeforeCostRowSelection=calc;
+calc=function(){rows.filter(row=>/assembl/i.test(row.name)).forEach(row=>{$('i-'+row.id).checked=false;$('v-'+row.id).value=0});const result=calculateBeforeCostRowSelection();refreshStandardRowVisibility();return result};
+const loadBeforeCostRowSelection=loadSetup;
+loadSetup=function(data){chosenStandardHeads.clear();loadBeforeCostRowSelection(data);resetStandardRowSelection()};
+const saveBeforeCostRowSelection=saveSetup;
+saveSetup=function(status){const previous=currentSetupNumber;saveBeforeCostRowSelection(status);if(previous!==currentSetupNumber)resetStandardRowSelection()};
+const snapshotBeforeCostRowSelection=snapshot;
+snapshot=function(){const data=snapshotBeforeCostRowSelection();data.costs=data.costs.filter(cost=>!/assembl/i.test(cost.name)).map(cost=>({...cost,included:Boolean(cost.included)&&Number(cost.value)>0}));return data};
+const newBeforeCostRowSelection=$('new').onclick;
+$('new').onclick=()=>{newBeforeCostRowSelection();resetStandardRowSelection()};
+const categoryBeforeCostRowSelection=$('category').onchange;
+$('category').onchange=()=>{categoryBeforeCostRowSelection();resetStandardRowSelection()};
+const productBeforeCostRowSelection=$('productSelect').onchange;
+$('productSelect').onchange=()=>{chosenStandardHeads.clear();productBeforeCostRowSelection();resetStandardRowSelection()};
+resetStandardRowSelection();

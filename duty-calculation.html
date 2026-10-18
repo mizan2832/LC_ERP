@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LC ERP · Duty Calculation</title><link rel="stylesheet" href="purchase.css"><link rel="stylesheet" href="invoice.css"><link rel="stylesheet" href="duty-calculation.css"></head><body class="approval-shell">
+<header class="top"><h1>Duty Calculation</h1><p>Manifest-based government duties · Actual versus saved standard</p></header><main class="app"><div class="toolbar duty-actions"><button id="newDuty">New / Clear</button><button id="draftDuty">Save Draft</button><button id="saveDuty" class="primary">Save Duty Calculation</button><button id="modifyDuty" disabled>Modify</button><button id="cancelDuty" disabled>Cancel</button></div><p id="message" role="status" aria-live="polite"></p>
+<section class="panel"><div class="invoice-heading"><h2>Document details</h2><span class="status-tag" id="dutyStatus">New</span></div><div class="grid invoice-grid">
+<label>Duty calculation number<input id="dutyNumber" readonly placeholder="Double-click to open saved duty calculation" title="Double-click or press Enter to search saved entries"></label>
+<label>Costing date *<input id="costDate" type="date"></label>
+<label>Transaction type<input value="Import duty calculation" readonly></label>
+<label>Search manifest / LC<input id="manifestSearch" type="search" placeholder="Manifest or LC number"></label>
+<label>Released manifest *<select id="manifest"><option value="">Select released manifest</option></select></label>
+<label>Manifest date<input id="manifestDate" readonly></label><label>Manifest quantity<input id="manifestQty" readonly></label>
+<label>Document release number<input id="releaseNumber" readonly></label>
+<label>LC number<input id="lcNumber" readonly></label><label>LC date<input id="lcDate" readonly></label><label>LC quantity<input id="lcQty" readonly></label>
+<label>Purchase requisition number / date<input id="poInfo" readonly></label><label>PI number / date<input id="piInfo" readonly></label>
+<label>Currency<input id="currency" readonly></label><label>Customs exchange rate (BDT) *<input id="rate" type="number" min="0.0001" step="any"></label>
+<label>Supplier<input id="party" readonly></label><label>Customs invoice number<input id="customInvoice" readonly></label>
+<label>Commercial invoice number<input id="commercialInvoice" readonly></label><label>Commercial invoice date<input id="commercialDate" readonly></label>
+<label>Reference number<input id="reference"></label><label>Reference date<input id="referenceDate" type="date"></label>
+<label>Bill of Entry number *<input id="boeNumber"></label><label>Bill of Entry date *<input id="boeDate" type="date"></label>
+<label>Duty party *<select id="dutyParty"></select></label><label>C&F party *<select id="cnfParty"></select></label>
+<label>HS codes<input id="hsCodes" readonly></label><label>Remarks<textarea id="remarks" rows="2"></textarea></label>
+</div></section>
+<section class="panel"><div class="invoice-heading"><h2>SKU duty calculation</h2><span class="invoice-hint">All amounts in BDT unless marked FC</span></div>
+<div class="table-wrap"><table class="duty-items"><thead id="dutyHead"></thead><tbody id="dutyRows"></tbody><tfoot id="dutyFoot"></tfoot></table></div>
+<div class="invoice-totals"><div>Actual assessable value<strong id="totalAV">0.00</strong></div><div>Standard assessable value<strong id="totalStandardAV">0.00</strong></div><div>Total government payment — actual<strong id="totalActual">0.00</strong></div><div>Total government payment — standard<strong id="totalStandard">0.00</strong></div></div></section></main>
+<dialog id="dutyPicker"><div class="invoice-heading"><h2>Open duty calculation</h2><button id="closeDutyPicker">Close</button></div><label>Search duty, manifest or LC<input id="dutySearch" type="search" placeholder="Duty number, manifest or LC number"></label><div id="dutyChoices"></div></dialog>
+<script src="products.js"></script><script src="purchase-store.js"></script><script src="rollback.js"></script><script src="invoice-store.js"></script><script src="lc-dates.js"></script><script src="lc-store.js"></script><script src="port-store.js"></script><script src="cost-allocation.js"></script><script src="lc-expense-store.js"></script><script src="document-release-store.js"></script><script src="duty-store.js"></script><script src="duty-calculation.js"></script><script src="purchase-sidebar.js"></script></body></html>

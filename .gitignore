@@ -1,0 +1,6 @@
+﻿.vscode/
+outputs/
+.env
+.env.*
+!.env.example
+*.log
