@@ -119,3 +119,7 @@ Cancelled LC references and manifest numbers may be reused by replacement record
 
 
 Bike upload format now uses Item Code / Chassis No / Battery No. Process Data assigns chassis and battery to each one-unit bike row; unuploaded units remain pending. Completed bike receipts require chassis and battery; engine is optional and may still be entered manually. Old engine/chassis templates are rejected with a format message to avoid placing engine values into chassis fields. Existing saved receipts are not rewritten.
+
+
+## PI standard landed cost PDF
+The Standard Landed Cost PDF button beside Excel Format downloads a quantity-based, read-only preview for included PI items, including unsaved quantities. Before LC opening it uses the latest completed standard effective on the PI date; after opening it uses the LC's captured snapshots (legacy expense snapshots if present). It shows per-item versions, order/converted quantities, included and excluded heads, standard rates, quantity-scaled BDT amounts, item totals and head totals. Missing setups, invalid unit mappings or missing computed percentage amounts produce a clearly incomplete estimate, never a complete zero-cost quote. PI prices and saved records are unchanged. jsPDF 4.2.1 is bundled locally in vendor with its MIT license; no PDF CDN dependency.
