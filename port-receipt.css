@@ -1,2 +1,4 @@
 .port-actions{justify-content:center;flex-wrap:wrap}.port-plan{min-width:750px;margin-top:15px}.port-items{min-width:1700px}.approval-shell .port-items input,.approval-shell .port-plan input{margin:0;min-width:100px}.approval-shell .port-items input[type=checkbox]{min-width:16px;width:16px;accent-color:#168970}.invalid-port-row{background:#fff0ed}.invalid-port-row td:nth-last-child(2){color:#b42318}.approval-shell dialog{width:min(850px,94vw);max-height:80vh;overflow:auto;border:1px solid #dce5ed;border-radius:8px;padding:24px}.approval-shell dialog::backdrop{background:#112b4088}#portItemChoices button{display:block;width:100%;text-align:left;margin-top:10px}
 #portModifyOptions button{display:block;width:100%;text-align:left;margin-top:10px}
+
+#receivedTotals td,#receivedTotals th,#valuationTotals td,#valuationTotals th{background:#e5f2ed;font-weight:700;border-top:2px solid #168970;white-space:nowrap}
