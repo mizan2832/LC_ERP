@@ -31,3 +31,34 @@ function productToRequisition(p){return {code:p.sku,description:p.product,hs:p.h
 
 // Sample choices for margin entry; no bank agreement rates are implied.
 const MARGIN_BANK_NAMES=['Sonali Bank','Janata Bank','Agrani Bank','Rupali Bank','BRAC Bank','Eastern Bank','Dutch-Bangla Bank','The City Bank','Prime Bank','Bank Asia'];
+
+// Invoice catalogue: 9 September 2026. Reference prices are USD, not saved standards.
+const INVOICE_LUBRICANTS=[
+ ['Vigor','15W40','208L',208,1.90,395.20,'CI-4','GY-VIGOR-208L'],
+ ['Vigor','15W40','15L',15,1.97,29.55,'CI-4'],
+ ['Vigor','15W40','10L',10,1.99,19.90,'CI-4'],
+ ['Vigor','15W40','5L×4',20,2.05,41.00,'CI-4'],
+ ['Vigor','15W40','3L×4',12,2.07,24.84,'CI-4'],
+ ['Vigor','15W40','1L×12',12,2.15,25.80,'CI-4'],
+ ['Dominor','20W50','15L',15,1.46,21.90,'CF-4'],
+ ['Dominor','20W50','10L',10,1.48,14.80,'CF-4'],
+ ['Dominor','20W50','5L×4',20,1.50,30.00,'CF-4'],
+ ['Dominor','20W50','3L×4',12,1.55,18.60,'CF-4'],
+ ['Dominor','20W50','1L×12',12,1.60,19.20,'CF-4'],
+ ['Splendour','20W50','4L×4',16,2.00,32.00,'SL'],
+ ['Splendour','20W50','5L×4',20,1.98,39.60,'SL'],
+ ['Fuerza 4T','10W30','1L×12',12,3.15,37.80,'SL'],
+ ['Fuerza 4T','20W50','1L×12',12,1.75,21.00,'SL'],
+ ['Shift Premium','80W90','4L×4',16,2.65,42.40,'GL-4'],
+ ['Shift Premium','85W140','4L×4',16,2.75,44.00,'GL-4'],
+ ['Avalon','3','0.5KG×12',6,6.70,40.20,'',null,'KG']
+].map(([specification,grade,packSize,factor,fobUnit,fobPack,api,existing,unit='LTR'])=>({category:'Goodyear lubricants',sku:existing||('GY-'+specification+'-'+grade+'-'+packSize).toUpperCase().replace(/ /g,'-').replace(/×/g,'X').replace(/\./g,'P'),product:'Goodyear '+specification+'_'+grade+'_'+packSize,specification:'Goodyear '+specification,grade,packSize,unit,pack:String(factor),uom:'PACK',model:'Goodyear '+specification,api,invoiceReference:'2026-09-09',referenceFobUnitUSD:fobUnit,referenceFobPackUSD:fobPack,hs:unit==='KG'?'27101989':'27101931'}));
+INVOICE_LUBRICANTS.forEach(item=>{const prior=PRODUCT_DATASET.find(p=>p.sku===item.sku);if(prior){prior.product=item.product;prior.grade=item.grade;prior.packSize=item.packSize;prior.specification=item.specification;prior.api=item.api;prior.referenceFobUnitUSD=item.referenceFobUnitUSD;prior.referenceFobPackUSD=item.referenceFobPackUSD;prior.invoiceReference=item.invoiceReference}else PRODUCT_DATASET.push({...item,invoiceAddition:true,hsStatus:'Provisional — verify before customs use'})});
+const ItemCatalogHistory={
+ key:'lc-invoice-catalog-history-v1',
+ read(){const state=JSON.parse(localStorage.getItem(this.key)||'null');return state&&Array.isArray(state.states)&&Number.isInteger(state.cursor)&&state.cursor>=0&&state.cursor<state.states.length?state:{states:[false,true],cursor:1}},
+ enabled(){const state=this.read();return state.states[state.cursor]},
+ move(delta){const state=this.read(),cursor=state.cursor+delta;if(cursor<0||cursor>=state.states.length)return;localStorage.setItem(this.key,JSON.stringify({...state,cursor}));return this.enabled()}
+};
+const datasetWithInvoiceItems=getProductDataset;
+getProductDataset=function(){return datasetWithInvoiceItems().filter(p=>!p.invoiceAddition||ItemCatalogHistory.enabled())};
