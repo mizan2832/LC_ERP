@@ -14,14 +14,15 @@ function releaseLists(){
 }
 function renderManifestDetails(calc){
  const rows=calc.rows.filter(row=>row.manifestQty>0);
+ const valueTotal=field=>rows.every(row=>row[field]!==null&&row[field]!==undefined)?drFmt(rows.reduce((sum,row)=>sum+Number(row[field]),0)):'Not captured';
  rows.forEach(row=>{
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td>${drEscape(row.itemName)}</td><td>${drFmt(row.ordered)} ${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)} ${drEscape(row.uom)}</td><td>${row.totalOrderLC===null||row.totalOrderLC===undefined?'Not captured':drFmt(row.totalOrderLC)}</td><td>${drFmt(row.amountLC)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;
+  tr.innerHTML=`<td>${drEscape(row.itemName)}</td><td>${drFmt(row.ordered)} ${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)} ${drEscape(row.uom)}</td><td>${row.totalOrderLC===null||row.totalOrderLC===undefined?'Not captured':drFmt(row.totalOrderLC)}</td><td>${row.manifestOpeningLC===null?'Not captured':drFmt(row.manifestOpeningLC)}</td><td>${drFmt(row.amountLC)}</td><td>${row.exchangeDifference===null?'Not captured':drFmt(row.exchangeDifference)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;
   dr('releaseRows').append(tr);
  });
  const units=new Map();rows.forEach(row=>{const quantities=units.get(row.uom)||{ordered:0,manifestQty:0};quantities.ordered+=row.ordered;quantities.manifestQty+=row.manifestQty;units.set(row.uom,quantities)});
  const quantityTotal=field=>[...units].map(([unit,quantities])=>drFmt(quantities[field])+' '+drEscape(unit)).join('<br>');
- dr('releaseTotals').innerHTML=`<tr><td>Total</td><td>${quantityTotal('ordered')}</td><td>${quantityTotal('manifestQty')}</td><td>${rows.every(row=>row.totalOrderLC!==null&&row.totalOrderLC!==undefined)?drFmt(rows.reduce((sum,row)=>sum+row.totalOrderLC,0)):'Not captured'}</td><td>${drFmt(rows.reduce((sum,row)=>sum+row.amountLC,0))}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
+ dr('releaseTotals').innerHTML=`<tr><td>Total</td><td>${quantityTotal('ordered')}</td><td>${quantityTotal('manifestQty')}</td><td>${rows.every(row=>row.totalOrderLC!==null&&row.totalOrderLC!==undefined)?drFmt(rows.reduce((sum,row)=>sum+row.totalOrderLC,0)):'Not captured'}</td><td>${valueTotal('manifestOpeningLC')}</td><td>${drFmt(rows.reduce((sum,row)=>sum+row.amountLC,0))}</td><td>${valueTotal('exchangeDifference')}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
 }
 function renderRelease(){
  const old=releaseId?ReleaseStore.read().find(r=>r.id===releaseId):null;
@@ -34,7 +35,7 @@ function renderRelease(){
    const calc=ReleaseStore.calculate(releaseBasis,dr('rate').value,dr('loanType').value,releaseId,dr('loanValue').value);
    renderManifestDetails(calc);
    dr('cashMargin').value=drFmt(calc.cashMargin);dr('usedMargin').value=drFmt(calc.usedMargin);dr('remainingMargin').value=drFmt(calc.remainingCashMargin);dr('margin').value=drFmt(calc.margin);
-   dr('releaseNote').textContent='Both margins use their total LC margin amounts weighted by PI item value and manifest quantity. Variance = actual minus standard. Saved releases retain their captured margin amounts.';
+   dr('releaseNote').textContent='Opening-rate values remain fixed. Bank-rate value = manifest foreign-currency value times the entered bank conversion rate; exchange difference = bank-rate value minus opening-rate value (positive means an increase in BDT). Until confirmed by the bank, this is an estimate. Cash margins remain unchanged; LATR is entered manually from bank advice.';
   }catch(e){drMessage(e.message,true)}
  }
  dr('loanNote').textContent=dr('loanType').value==='LATR'?'Enter the LATR amount manually in BDT.':'';

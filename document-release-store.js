@@ -57,14 +57,15 @@ const ReleaseStore={
    const setup=standards.find(s=>s.fields?.sku===line.itemCode);
    const sameUnit=String(setup?.fields?.unit||'').toUpperCase()===String(line.uom||'').toUpperCase();
    const standard=setup&&Number.isFinite(Number(setup.calculation?.total))?Number(setup.calculation.total)*(sameUnit?1:Number(line.factor||1)):null;
-   if(!group){group={itemCode:line.itemCode,itemName:line.itemName,uom:line.uom,ordered:0,manifestQty:0,amountFC:0,totalOrderLC:0,margin:0,standardManifestMargin:standardWeighted?0:null,actualLCItemMargin:0,standardMarginUnit:marginBySource.get(key),standardUnit:standard,standardSetup:setup?.setupNumber||''};groups.set(groupKey,group)}
+   if(!group){group={itemCode:line.itemCode,itemName:line.itemName,uom:line.uom,ordered:0,manifestQty:0,amountFC:0,totalOrderLC:0,manifestOpeningLC:0,margin:0,standardManifestMargin:standardWeighted?0:null,actualLCItemMargin:0,standardMarginUnit:marginBySource.get(key),standardUnit:standard,standardSetup:setup?.setupNumber||''};groups.set(groupKey,group)}
    group.totalOrderLC+=Number(line.amountLC);
    group.actualLCItemMargin+=actualShares.get(key)||0;group.ordered+=Number(line.qty);group.manifestQty+=qty;group.amountFC+=qty*Number(line.amountFC)/Number(line.qty);
    const cents=Math.round((actualShares.get(key)||0)*100),before=priorQuantities.get(key)||0,ordered=Number(line.qty);
    if(standardWeighted){const standardCents=Math.round(standardWeighted[index]*100);group.standardManifestMargin+=(Math.round(standardCents*Math.min(ordered,before+qty)/ordered)-Math.round(standardCents*Math.min(ordered,before)/ordered))/100;}
+   const openingCents=Math.round(Number(line.amountLC)*100);group.manifestOpeningLC+=(Math.round(openingCents*Math.min(ordered,before+qty)/ordered)-Math.round(openingCents*Math.min(ordered,before)/ordered))/100;
    group.margin+=(Math.round(cents*Math.min(ordered,before+qty)/ordered)-Math.round(cents*Math.min(ordered,before)/ordered))/100;
   });
-  return {receiptId:receipt.id,manifest:receipt.header.manifest,customInvoice:receipt.header.customInvoice||'',lcOpeningId:lc.id,lcNumber:lc.number,currency:receipt.currency||lc.header.currency,rate:Number(receipt.exchangeRate||lc.header.rate),party:lc.header.party,receiptDate:receipt.header.receiptDate,rows:[...groups.values()],totalCashMargin,marginMissing:[...new Set(marginMissing)],marginMethod:'Actual LC cash margin allocated by item value and manifest quantity',marginAvailable:expenses.some(e=>e.rows.some(r=>/\bmargin\b/i.test(r.headName||r.headKey)))};
+  return {receiptId:receipt.id,manifest:receipt.header.manifest,customInvoice:receipt.header.customInvoice||'',lcOpeningId:lc.id,lcNumber:lc.number,currency:receipt.currency||lc.header.currency,openingRate:Number(lc.header.rate),rate:Number(receipt.exchangeRate||lc.header.rate),party:lc.header.party,receiptDate:receipt.header.receiptDate,rows:[...groups.values()],totalCashMargin,marginMissing:[...new Set(marginMissing)],marginMethod:'Actual LC cash margin allocated by item value and manifest quantity',marginAvailable:expenses.some(e=>e.rows.some(r=>/\bmargin\b/i.test(r.headName||r.headKey)))};
  },
  savedItemMarginTotals(basis){
   const totals=new Map();
@@ -88,6 +89,8 @@ const ReleaseStore={
  },
  calculate(basis,rate,loanType,excludingId='',manualLoanValue=null){
   rate=Number(rate);if(!Number.isFinite(rate)||rate<=0)throw Error('Enter a positive updated exchange rate.');
+  let openingRate=Number(basis.openingRate);
+  if(!(openingRate>0)){try{openingRate=Number(LCStore.read().find(lc=>lc.id===basis.lcOpeningId)?.header?.rate)}catch{}}
   const rows=basis.rows.map(r=>({...r,amountLC:Math.round(r.amountFC*rate*100)/100,totalStandardLC:r.standardUnit===null?null:Math.round(r.standardUnit*r.manifestQty*100)/100}));
   // Older release snapshots did not capture the full item LC value.
   if(rows.some(row=>row.totalOrderLC===undefined)){
@@ -98,6 +101,10 @@ const ReleaseStore={
     row.totalOrderLC=sources.length&&Math.abs(sources.reduce((sum,line)=>sum+Number(line.qty),0)-Number(row.ordered))<0.000001?sources.reduce((sum,line)=>sum+Number(line.amountLC),0):null;
    });
   }
+  rows.forEach(row=>{
+   row.manifestOpeningLC=row.manifestOpeningLC??(openingRate>0?Math.round(row.amountFC*openingRate*100)/100:null);
+   row.exchangeDifference=row.manifestOpeningLC===null?null:Math.round((row.amountLC-row.manifestOpeningLC)*100)/100;
+  });
   if(rows.some(row=>row.actualLCItemMargin===undefined)){
    const recovered=this.savedItemMarginTotals(basis);
    rows.forEach(row=>{if(row.actualLCItemMargin===undefined&&recovered.has(row.itemCode+'|'+row.uom))row.actualLCItemMargin=Math.round(recovered.get(row.itemCode+'|'+row.uom)*100)/100});
