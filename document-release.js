@@ -16,12 +16,12 @@ function renderManifestDetails(calc){
  const rows=calc.rows.filter(row=>row.manifestQty>0);
  rows.forEach(row=>{
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td>${drEscape(row.itemName)}</td><td>${drFmt(row.ordered)} ${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)} ${drEscape(row.uom)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;
+  tr.innerHTML=`<td>${drEscape(row.itemName)}</td><td>${drFmt(row.ordered)} ${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)} ${drEscape(row.uom)}</td><td>${row.totalOrderLC===null||row.totalOrderLC===undefined?'Not captured':drFmt(row.totalOrderLC)}</td><td>${drFmt(row.amountLC)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;
   dr('releaseRows').append(tr);
  });
  const units=new Map();rows.forEach(row=>{const quantities=units.get(row.uom)||{ordered:0,manifestQty:0};quantities.ordered+=row.ordered;quantities.manifestQty+=row.manifestQty;units.set(row.uom,quantities)});
  const quantityTotal=field=>[...units].map(([unit,quantities])=>drFmt(quantities[field])+' '+drEscape(unit)).join('<br>');
- dr('releaseTotals').innerHTML=`<tr><td>Total</td><td>${quantityTotal('ordered')}</td><td>${quantityTotal('manifestQty')}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
+ dr('releaseTotals').innerHTML=`<tr><td>Total</td><td>${quantityTotal('ordered')}</td><td>${quantityTotal('manifestQty')}</td><td>${rows.every(row=>row.totalOrderLC!==null&&row.totalOrderLC!==undefined)?drFmt(rows.reduce((sum,row)=>sum+row.totalOrderLC,0)):'Not captured'}</td><td>${drFmt(rows.reduce((sum,row)=>sum+row.amountLC,0))}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
 }
 function renderRelease(){
  const old=releaseId?ReleaseStore.read().find(r=>r.id===releaseId):null;
