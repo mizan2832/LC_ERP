@@ -12,10 +12,10 @@ const ReleaseStore={
   lc.rows.forEach((line,index)=>{
    const amounts=expenses.flatMap(exp=>exp.rows.filter(r=>/\bmargin\b/i.test(r.headName||r.headKey)).map(head=>{
     const saved=head.standards?.find(s=>s.sku===line.itemCode&&s.valid);
-    if(saved)return {amount:Number(saved.standard),unit:saved.unit};
+    if(saved)return {amount:Number(saved.standard),unit:line.uom};
     const setup=exp.standardSnapshots?.find(s=>s.fields?.sku===line.itemCode);
     const cost=setup?.costs?.find(c=>c.included&&ExpenseStore.headKey(c)===head.headKey);
-    return cost?{amount:Number(setup.calculation?.amounts?.[cost.id]??cost.value),unit:setup.fields.unit}:null;
+    return cost?{amount:Number(setup.calculation?.amounts?.[cost.id]??cost.value),unit:line.uom}:null;
    }));
    if(!amounts.length||amounts.some(a=>!a||!Number.isFinite(a.amount)||a.amount<0)){marginMissing.push(line.itemCode);marginBySource.set(line.piId+':'+index,null);return}
    const norm=u=>String(u||'').toUpperCase().replace('LITRE','LTR');

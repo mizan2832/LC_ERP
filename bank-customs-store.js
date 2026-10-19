@@ -19,13 +19,14 @@ const BankCustomsStore={
   })});return [...found.values()].sort((a,b)=>a.group.localeCompare(b.group)||a.name.localeCompare(b.name));
  },
  checks(basis,headKey){
-  const normalize=u=>String(u||'').toUpperCase().replace('LITRE','LTR');
+  const normalize=u=>PriceUnits.normalize(u);
   return basis.rows.map(row=>{
    const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>BANK_CUSTOMS_GROUPS[c.key]&&c.included&&ExpenseStore.headKey(c)===headKey);
    const amount=cost?Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN)):NaN;
-   const factor=normalize(setup?.fields.unit)===normalize(row.uom)?1:normalize(setup?.fields.unit)===normalize(row.convertedUom)?Number(row.factor):NaN;
-   const valid=Number.isFinite(amount)&&amount>0&&Number.isFinite(factor)&&factor>0;
-   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,valid,standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:valid?'':row.itemCode+': no positive saved standard for this cost head or unit mapping is missing.'};
+   // BDT expense standards are per order unit; only FOB pricing converts LTR/KG.
+   const factor=1;
+   const valid=Number.isFinite(amount)&&amount>0&&Number.isFinite(factor)&&factor>0&&Number.isFinite(Number(row.qty))&&Number(row.qty)>0;
+   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,valid,unitStandard:valid?amount:null,standardQty:valid?Number(row.qty)*factor:null,standardUom:normalize(row.uom),standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:valid?'':row.itemCode+': no positive saved standard for this cost head or unit mapping is missing.'};
   });
  },
  standardTotal(basis,headKey){const checks=this.checks(basis,headKey);if(checks.some(c=>!c.valid))throw Error(checks.filter(c=>!c.valid).map(c=>c.message).join(' '));return this.round(checks.reduce((sum,c)=>sum+c.total,0))},

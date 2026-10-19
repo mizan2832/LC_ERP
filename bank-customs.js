@@ -3,6 +3,7 @@ let bcId='',bcRevision=0,bcStatus='New',bcEditing=false,bcBasis=null,bcRows=[],b
 function bcMessage(text,error=false){bc('message').textContent=text;bc('message').className=error?'error':'success'}
 function bcLocked(){return Boolean(bcId&&(bcStatus==='Cancelled'||BankCustomsStore.blocked(bcId)||!bcEditing))}
 function bcQty(rows){const units={};rows.forEach(r=>units[r.uom]=(units[r.uom]||0)+r.qty);return Object.entries(units).map(([unit,qty])=>bcFmt(qty)+' '+unit).join(' · ')}
+function bcStandardFormula(check){return bcFmt(check.unitStandard)+' BDT / '+check.standardUom+' x '+bcFmt(check.standardQty)+' '+check.standardUom+' = '+bcFmt(check.total)+' BDT'}
 function bcStandardBreakdown(cell,total,headKey){
  const opened=cell.querySelector('details')?.open||false;
  cell.replaceChildren();
@@ -11,7 +12,7 @@ function bcStandardBreakdown(cell,total,headKey){
  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Item-wise calculation';details.open=opened;details.append(summary);
  BankCustomsStore.checks(bcBasis,headKey).forEach(check=>{
   const line=document.createElement('div');line.className='bc-standard-breakdown';
-  line.textContent=check.sku+': '+bcFmt(check.standard)+' × '+bcFmt(check.qty)+' '+check.uom+' = '+bcFmt(check.total)+' BDT';
+  line.textContent=check.sku+': '+bcStandardFormula(check);
   line.title='Saved standard setup '+check.setupNumber;details.append(line);
  });cell.append(details);
 }
@@ -60,7 +61,7 @@ function openBCManifests(){if(bcId)return;bc('manifestSearch').value='';drawBCMa
 function drawBCSaved(){const query=bc('savedSearch').value.toLowerCase();bc('savedChoices').replaceChildren();BankCustomsStore.read().filter(r=>[r.number,r.manifestNumber,r.basis.lcNumber].join(' ').toLowerCase().includes(query)).forEach(record=>{const button=document.createElement('button');button.textContent=record.number+' · '+record.manifestNumber+' · '+record.status;button.onclick=()=>{const current=BankCustomsStore.read().find(r=>r.id===record.id);if(current){loadBC(current);bc('savedPicker').close()}};bc('savedChoices').append(button)});if(!bc('savedChoices').children.length)bc('savedChoices').textContent='No matching saved expense entries.'}
 function openBCSaved(){try{bc('savedSearch').value='';drawBCSaved();bc('savedPicker').showModal()}catch(error){bcMessage(error.message,true)}}
 function drawBCHeads(){const query=bc('headSearch').value.toLowerCase();bc('headChoice').replaceChildren(new Option('Select cost head',''));BankCustomsStore.heads(bcBasis).filter(head=>(head.name+' '+BANK_CUSTOMS_GROUPS[head.group]).toLowerCase().includes(query)).forEach(head=>bc('headChoice').add(new Option(BANK_CUSTOMS_GROUPS[head.group]+' · '+head.name,head.headKey)));checkBCHead();if(bc('headChoice').options.length===1){const note=document.createElement('div');note.className='standard-check missing';note.textContent='No matching positive standard costs in the saved manifest snapshots.';bc('headChecks').append(note)}}
-function checkBCHead(){bc('headChecks').replaceChildren();bc('confirmHead').disabled=true;const key=bc('headChoice').value;if(!key)return;const checks=BankCustomsStore.checks(bcBasis,key);checks.forEach(check=>{const div=document.createElement('div');div.className=check.valid?'standard-check valid':'standard-check missing';div.textContent=check.valid?check.sku+' · '+bcFmt(check.standard)+' × '+bcFmt(check.qty)+' '+check.uom+' = '+bcFmt(check.total)+' BDT':check.message;bc('headChecks').append(div)});const duplicate=bcRows.some((r,i)=>i!==bcActive&&r.headKey===key);if(duplicate){const div=document.createElement('div');div.textContent='This cost head is already added.';bc('headChecks').append(div)}bc('confirmHead').disabled=duplicate||checks.some(c=>!c.valid)}
+function checkBCHead(){bc('headChecks').replaceChildren();bc('confirmHead').disabled=true;const key=bc('headChoice').value;if(!key)return;const checks=BankCustomsStore.checks(bcBasis,key);checks.forEach(check=>{const div=document.createElement('div');div.className=check.valid?'standard-check valid':'standard-check missing';div.textContent=check.valid?check.sku+' · '+bcStandardFormula(check):check.message;bc('headChecks').append(div)});const duplicate=bcRows.some((r,i)=>i!==bcActive&&r.headKey===key);if(duplicate){const div=document.createElement('div');div.textContent='This cost head is already added.';bc('headChecks').append(div)}bc('confirmHead').disabled=duplicate||checks.some(c=>!c.valid)}
 function openBCHeads(index){if(bcLocked()||bcRows[index].glStatus==='Posted')return;bcActive=index;bc('headSearch').value='';drawBCHeads();bc('costPicker').showModal()}
 bc('manifestNumber').ondblclick=openBCManifests;bc('manifestNumber').onkeydown=e=>{if(e.key==='Enter')openBCManifests()};bc('selectManifest').onclick=openBCManifests;bc('closeManifest').onclick=()=>bc('manifestPicker').close();bc('manifestSearch').oninput=drawBCManifests;
 bc('expenseNumber').ondblclick=openBCSaved;bc('expenseNumber').onkeydown=e=>{if(e.key==='Enter')openBCSaved()};bc('closeSaved').onclick=()=>bc('savedPicker').close();bc('savedSearch').oninput=drawBCSaved;
