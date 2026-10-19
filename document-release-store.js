@@ -35,6 +35,12 @@ const ReleaseStore={
     const key=line.piId+':'+index;actualShares.set(key,actualShares.get(key)+line.allocatedExpense);
    });
   });
+  // Allocate both full LC margin pools using the same PI value weights.
+  const standardCashMargin=marginMissing.length?null:lc.rows.reduce((sum,line,index)=>sum+marginBySource.get(line.piId+':'+index)*Number(line.qty),0);
+  const piBasis=lc.rows.map(line=>({...line,amountLC:Number(line.amountFC)}));
+  const weightedShares=amount=>CostAllocation.calculate(piBasis,[{headKey:'margin',headName:'Margin',amount}]).lines.map(line=>line.allocatedExpense);
+  const actualWeighted=weightedShares(totalCashMargin),standardWeighted=standardCashMargin===null?null:weightedShares(standardCashMargin);
+  lc.rows.forEach((line,index)=>actualShares.set(line.piId+':'+index,actualWeighted[index]));
   const priorQuantities=new Map();
   for(const earlier of receipts){
    if(earlier.id===receipt.id)break;
@@ -51,9 +57,10 @@ const ReleaseStore={
    const setup=standards.find(s=>s.fields?.sku===line.itemCode);
    const sameUnit=String(setup?.fields?.unit||'').toUpperCase()===String(line.uom||'').toUpperCase();
    const standard=setup&&Number.isFinite(Number(setup.calculation?.total))?Number(setup.calculation.total)*(sameUnit?1:Number(line.factor||1)):null;
-   if(!group){group={itemCode:line.itemCode,itemName:line.itemName,uom:line.uom,ordered:0,manifestQty:0,amountFC:0,margin:0,actualLCItemMargin:0,standardMarginUnit:marginBySource.get(key),standardUnit:standard,standardSetup:setup?.setupNumber||''};groups.set(groupKey,group)}
+   if(!group){group={itemCode:line.itemCode,itemName:line.itemName,uom:line.uom,ordered:0,manifestQty:0,amountFC:0,margin:0,standardManifestMargin:standardWeighted?0:null,actualLCItemMargin:0,standardMarginUnit:marginBySource.get(key),standardUnit:standard,standardSetup:setup?.setupNumber||''};groups.set(groupKey,group)}
    group.actualLCItemMargin+=actualShares.get(key)||0;group.ordered+=Number(line.qty);group.manifestQty+=qty;group.amountFC+=qty*Number(line.amountFC)/Number(line.qty);
    const cents=Math.round((actualShares.get(key)||0)*100),before=priorQuantities.get(key)||0,ordered=Number(line.qty);
+   if(standardWeighted){const standardCents=Math.round(standardWeighted[index]*100);group.standardManifestMargin+=(Math.round(standardCents*Math.min(ordered,before+qty)/ordered)-Math.round(standardCents*Math.min(ordered,before)/ordered))/100;}
    group.margin+=(Math.round(cents*Math.min(ordered,before+qty)/ordered)-Math.round(cents*Math.min(ordered,before)/ordered))/100;
   });
   return {receiptId:receipt.id,manifest:receipt.header.manifest,customInvoice:receipt.header.customInvoice||'',lcOpeningId:lc.id,lcNumber:lc.number,currency:receipt.currency||lc.header.currency,rate:Number(receipt.exchangeRate||lc.header.rate),party:lc.header.party,receiptDate:receipt.header.receiptDate,rows:[...groups.values()],totalCashMargin,marginMissing:[...new Set(marginMissing)],marginMethod:'Actual LC cash margin allocated by item value and manifest quantity',marginAvailable:expenses.some(e=>e.rows.some(r=>/\bmargin\b/i.test(r.headName||r.headKey)))};
@@ -85,7 +92,7 @@ const ReleaseStore={
    const recovered=this.savedItemMarginTotals(basis);
    rows.forEach(row=>{if(row.actualLCItemMargin===undefined&&recovered.has(row.itemCode+'|'+row.uom))row.actualLCItemMargin=Math.round(recovered.get(row.itemCode+'|'+row.uom)*100)/100});
   }
-  rows.forEach(row=>{row.actualMarginPerUnit=row.manifestQty>0?Number(row.margin)/Number(row.manifestQty):null;row.standardManifestMargin=row.standardMarginUnit===null||row.standardMarginUnit===undefined?null:Math.round(row.standardMarginUnit*row.manifestQty*100)/100;row.marginVariance=row.standardManifestMargin===null?null:Math.round((row.margin-row.standardManifestMargin)*100)/100});
+  rows.forEach(row=>{row.actualMarginPerUnit=row.manifestQty>0?Number(row.margin)/Number(row.manifestQty):null;row.standardManifestMargin=row.standardManifestMargin!==undefined?row.standardManifestMargin:row.standardMarginUnit===null||row.standardMarginUnit===undefined?null:Math.round(row.standardMarginUnit*row.manifestQty*100)/100;row.marginVariance=row.standardManifestMargin===null?null:Math.round((row.margin-row.standardManifestMargin)*100)/100});
   const marginVarianceComplete=rows.filter(row=>row.manifestQty>0).every(row=>row.marginVariance!==null);
   const totalFC=rows.reduce((s,r)=>s+r.amountFC,0),totalLC=rows.reduce((s,r)=>s+r.amountLC,0),margin=Math.round(rows.reduce((s,r)=>s+r.margin,0)*100)/100;
   const cashMargin=Number(basis.totalCashMargin||0),usedMargin=Math.round(this.read().filter(r=>r.id!==excludingId&&r.lcOpeningId===basis.lcOpeningId&&r.status!=='Cancelled').reduce((s,r)=>s+Number(r.margin||0),0)*100)/100;
