@@ -15,6 +15,19 @@ const CNF_PARTIES=[{id:'CNF-001',name:'Sample C&F Agent — Chattogram'},{id:'CN
 const DutyStore={
  key:'lc-duty-calculations-v1',
  headConfigured(row,head){const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);return Boolean(cost?.included)&&cost.value!==''&&cost.value!==null&&Number.isFinite(Number(cost.value))&&Number.isFinite(Number(setup.calculation?.amounts?.[cost.id]??cost.value))},
+ // Saved BDT standards are per order unit, independent of FOB LTR/KG pricing.
+ orderStandards(basis){
+  return {...basis,standardUnitBasis:'order',rows:basis.rows.map(row=>{
+   const setup=row.standardSnapshot;if(!setup)return {...row};
+   const amounts=setup.calculation?.amounts||{},costValue=cost=>cost?.included?Number(amounts[cost.id]??(cost.method==='fixed'?cost.value:NaN)):0;
+   const heads=Object.fromEntries(DUTY_HEADS.map(head=>{
+    const cost=setup.costs?.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);
+    return [head.id,{...row.heads[head.id],method:cost?.included?cost.method:'fixed',value:cost?.included?Number(cost.value):0,standard:costValue(cost)}];
+   }));
+   const cf=setup.costs?.find(cost=>cost.id==='cf-2');
+   return {...row,heads,cf:costValue(cf),standardAV:Number(setup.calculation?.customsAssessableValue),standardPSI:Number(setup.calculation?.psiAssessableValue??setup.fields?.psiAV??0)};
+  })};
+ },
  validateConfiguredHeads(basis,result,old){for(const row of result.rows){const source=basis.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);for(const head of DUTY_HEADS){if(this.headConfigured(source,head))continue;const actual=row.heads[head.id].actual,previous=old?.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom)?.heads?.[head.id]?.actual;if(Number(actual)>0&&(!old||Number(previous)!==Number(actual)))throw Error(row.itemCode+': '+head.name+' is not configured in the saved LC standard. Cancel downstream entries in reverse order and cancel/recreate the LC opening to use a new standard.')}}},
  read(){const records=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(records))throw Error('Invalid duty calculation storage.');return records},
  round(v){return Math.round((v+Number.EPSILON)*100)/100},
@@ -41,16 +54,17 @@ const DutyStore={
    const costValue=cost=>cost?.included?Number(amounts[cost.id]??(cost.method==='fixed'?cost.value:NaN)):0;
    const heads={};DUTY_HEADS.forEach(head=>{
     const cost=costs.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);
-    heads[head.id]={method:cost?.included?cost.method:'fixed',value:cost?.included?Number(cost.value)*(cost.method==='fixed'&&valid?factor:1):0,standard:valid?costValue(cost)*factor:null};
+    heads[head.id]={method:cost?.included?cost.method:'fixed',value:cost?.included?Number(cost.value):0,standard:valid?costValue(cost):null};
    });
    const rate=group.valueFC/group.qty,cf=costs.find(c=>c.id==='cf-2');
-   return {...group,hs:group.hs||setup?.fields.hs||'',rate,freight:valid?Number(setup.fields.freight||0)*factor*(setup.fields.currency===release.basis.currency?1:Number(setup.fields.fx)/Number(lc.header.rate)):0,insurance:lcValue>0?insuranceTotal*group.valueFC/lcValue/group.qty:0,cf:valid?costValue(cf)*factor:0,heads,standardFOB:valid?Number(setup.fields.pi)*factor:null,standardCurrency:setup?.fields.currency||'',standardPSI:valid?Number(setup.calculation?.psiAssessableValue??setup.fields.psiAV??0)*factor:null,actualPSI:0,standardAV:valid?Number(setup.calculation.customsAssessableValue)*factor:null,standardSetup:setup?.setupNumber||'',standardSnapshot:valid?JSON.parse(JSON.stringify(setup)):null};
+   return {...group,hs:group.hs||setup?.fields.hs||'',rate,freight:valid?Number(setup.fields.freight||0)*factor*(setup.fields.currency===release.basis.currency?1:Number(setup.fields.fx)/Number(lc.header.rate)):0,insurance:lcValue>0?insuranceTotal*group.valueFC/lcValue/group.qty:0,cf:valid?costValue(cf):0,heads,standardFOB:valid?Number(setup.fields.pi)*factor:null,standardCurrency:setup?.fields.currency||'',standardPSI:valid?Number(setup.calculation?.psiAssessableValue??setup.fields.psiAV??0):null,actualPSI:0,standardAV:valid?Number(setup.calculation.customsAssessableValue):null,standardSetup:setup?.setupNumber||'',standardSnapshot:valid?JSON.parse(JSON.stringify(setup)):null};
   });
   const pis=[...new Set(lc.rows.map(r=>r.piId))].map(id=>PIStore.read().find(p=>p.id===id)).filter(Boolean);
   const requisitions=pis.map(pi=>PRStore.read().find(r=>r.number===pi.requisitionNumber)).filter(Boolean);
   return {valuationVersion:2,documentReleaseId:release.id,releaseNumber:release.number,portReceiptId:receipt.id,manifestNumber:receipt.header.manifest,manifestDate:receipt.header.manifestDate,lcOpeningId:lc.id,lcNumber:lc.number,lcDate:lc.header.issue,party:lc.header.party,currency:release.basis.currency,rate:Number(release.header.rate),customInvoice:receipt.header.customInvoice||'',commercialInvoice:receipt.header.commercialInvoice||'',commercialDate:receipt.header.commercialDate||'',piInfo:pis.map(p=>p.number+' / '+p.header.piDate).join(', '),poInfo:requisitions.map(r=>r.number+' / '+r.header.planDate).join(', '),orderQuantities:lc.rows.map(r=>({qty:Number(r.qty),uom:r.uom})),rows};
  },
  calculate(basis,inputRows,exchangeRate){
+  basis=this.orderStandards(basis);
   const fx=this.number(exchangeRate,'customs exchange rate');if(fx<=0)throw Error('Customs exchange rate must be positive.');
   if(inputRows.length!==basis.rows.length)throw Error('Manifest item rows cannot be added or removed.');
   const seen=new Set();const rows=inputRows.map(input=>{
@@ -78,7 +92,7 @@ const DutyStore={
   if(!['Draft','Saved'].includes(input.status))throw Error('Invalid duty status.');
   const release=ReleaseStore.read().find(r=>r.id===input.documentReleaseId&&r.status==='Released');if(!release)throw Error('Select a released manifest.');
   if(records.some(r=>r.id!==input.id&&r.portReceiptId===release.portReceiptId&&r.status!=='Cancelled'))throw Error('Duty calculation already exists for this manifest.');
-  const basis=old?.basis||this.basis(release.id);
+  const basis=this.orderStandards(old?.basis||this.basis(release.id));
   const date=input.header.costDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<release.header.releaseDate)throw Error('Costing date must be valid and on or after document release date.');
   if(input.status==='Saved'){
    if(!DUTY_PARTIES.some(p=>p.id===input.header.dutyParty)||!CNF_PARTIES.some(p=>p.id===input.header.cnfParty))throw Error('Select duty party and C&F party.');
