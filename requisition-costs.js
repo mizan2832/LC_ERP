@@ -9,12 +9,12 @@ function captureRequisitionStandard(row, records, date) {
   if (!standard) return null;
   const f = standard.fields;
   const normalize = unit => String(unit || '').toUpperCase().replace('LITRE','LTR');
-  const factor = normalize(f.unit) === normalize(row.item.uom) ? 1 :
+  const factor = normalize(f.unit) === normalize(PriceUnits.unit(row.item)) ? 1 :
     normalize(f.unit) === normalize(row.item.convertedUom) ? Number(row.item.factor) : NaN;
   const price = Number(f.pi) * factor;
   if (!Number.isFinite(price) || price < 0) return null;
   return {itemCode:row.item.code, setupNumber:standard.setupNumber,
-    unitPrice:price, currency:f.currency || 'USD', unit:row.item.uom};
+    unitPrice:price, currency:f.currency || 'USD', unit:PriceUnits.unit(row.item),priceBasisVersion:2};
 }
 const pickBeforeStandardPrices = pick;
 pick = function(code) {
@@ -46,7 +46,7 @@ render = function() {
   renderBeforeStandardPrices();
   document.querySelectorAll('[data-standard-price]').forEach((cell,index) => {
     const snapshot = rows[index]?.standardPriceSnapshot;
-    cell.textContent = snapshot ? `${fmt(snapshot.unitPrice)} ${snapshot.currency}` : 'Not captured';
+    cell.textContent = snapshot ? `${fmt(snapshot.unitPrice)} ${snapshot.currency} / ${snapshot.unit}` : 'Not captured';
     cell.title = snapshot ? `PI FOB per ${snapshot.unit}; saved standard ${snapshot.setupNumber}` :
       'No standard price captured. Historical entries are not recalculated from the current master.';
   });

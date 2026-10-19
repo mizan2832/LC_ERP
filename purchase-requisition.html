@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><script src="price-units.js"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LC ERP - Purchase Requisition</title>
 <style>
@@ -33,7 +33,7 @@
 <div class="region-head"><div><h2>Purchase Requisition Items <span id="entryMode" class="mode-chip">Manual Entry</span></h2></div><div class="region-actions"><button class="btn" id="excelFormatBtn">Excel Format</button><button class="btn" id="uploadBtn">Upload Excel File</button><button class="btn primary" id="processBtn" disabled>Process Data</button><span id="uploadName" class="upload-name"></span><input type="file" id="uploadInput" accept=".xlsx,.xls,.csv,.txt" hidden></div></div>
 
 <div class="toolbar" id="manualToolbar"><button class="btn" id="addRowBtn">+ Add New Item</button></div>
-<div class="table-wrap"><table><thead><tr><th>SL</th><th>Item Code</th><th>Item Description</th><th>Grade</th><th>Pack Size</th><th>Category</th><th>Colour</th><th>Model Name</th><th>UOM</th><th>UOM Detail</th><th>Conv. Factor</th><th>Req. Qty.</th><th>Converted Qty.</th><th>Unit Price</th><th>Standard Unit Price</th><th>Amount (FC)</th><th>Amount (LC / BDT)</th><th>Upload Result</th><th>Validation Reason</th><th>Delete</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<div class="table-wrap"><table><thead><tr><th>SL</th><th>Item Code</th><th>Item Description</th><th>Grade</th><th>Pack Size</th><th>Category</th><th>Colour</th><th>Model Name</th><th>UOM</th><th>UOM Detail</th><th>Conv. Factor</th><th>Req. Qty.</th><th>Converted Qty.</th><th>FOB unit price / LTR, KG or PCS</th><th>Standard Unit Price</th><th>Amount (FC)</th><th>Amount (LC / BDT)</th><th>Upload Result</th><th>Validation Reason</th><th>Delete</th></tr></thead><tbody id="rows"></tbody></table></div></section>
 <section class="panel"><div class="footer-grid"><div class="field"><label>Remarks</label><textarea id="remarks" rows="3" placeholder="Enter remarks"></textarea></div><div class="totals"><span>Total Required Qty.</span><strong id="totalQty">0</strong></div><div class="totals"><span>Total Quantity with Converted UOM</span><strong id="totalConverted">0</strong></div><div class="totals"><span>Total Amount (FC)</span><strong id="totalAmount">0.00</strong></div><div class="totals"><span>Total Amount (LC / BDT)</span><strong id="totalAmountLC">0.00</strong></div></div></section>
 </main>
 <div class="modal" id="modal"><div class="modal-box"><div class="modal-head"><h3>Select Item</h3><button class="btn" id="closeModal">Close</button></div><input class="search" id="search" placeholder="Search by item code, description, grade, pack size or category"><div class="table-wrap"><table style="min-width:1100px"><thead><tr><th>Item Code</th><th>Description</th><th>Grade</th><th>Pack Size</th><th>Category</th><th>Model</th><th>UOM</th><th>UOM Detail</th><th>Conv. Factor</th><th>Select</th></tr></thead><tbody id="itemList"></tbody></table></div></div></div>
@@ -58,7 +58,7 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function notify(text,type='ok'){$('msg').className='message '+type;$('msg').textContent=text;window.scrollTo({top:0,behavior:'smooth'})}
 function addRow(){if(approved)return notify('Approved Purchase Requisition cannot be modified.','err');if(uploadMode)return notify('Uploaded rows are read-only. Clear the page to return to manual entry.','err');rows.push({id:seq++,item:null,itemCode:'',colour:'',reqQty:1,unitPrice:0,uploadResult:'',reason:''});render()}
 function converted(r){return r.item ? Number(r.reqQty||0)*Number(r.item.factor||0) : 0}
-function amount(r){return r.item ? Number(r.reqQty||0)*Number(r.unitPrice||0) : 0}
+function amount(r){return r.item ? PriceUnits.amount(r.item,r.reqQty,r.unitPrice) : 0}
 function convertedLabel(r){return r.item ? qty(converted(r))+' '+r.item.convertedUom : ''}
 function rowCountsInTotals(r){return !uploadMode || r.uploadResult==='READY TO INSERT'}
 function render(){
