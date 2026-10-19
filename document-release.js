@@ -16,20 +16,12 @@ function renderRelease(){
  const old=releaseId?ReleaseStore.read().find(r=>r.id===releaseId):null;
  const blocked=old?ReleaseStore.blocked(old.id):'',locked=Boolean(old&&(old.glStatus==='Posted'||old.status==='Cancelled'||blocked||!releaseEditing));
  dr('releaseStatus').textContent=releaseEditing?'Editing':releaseStatus;
- dr('releaseRows').replaceChildren();dr('releaseTotals').replaceChildren();
  if(releaseBasis){
   ['lcNumber','customInvoice','party','currency'].forEach(id=>dr(id).value=releaseBasis[id]||'');
   try{
    const calc=ReleaseStore.calculate(releaseBasis,dr('rate').value,dr('loanType').value,releaseId,dr('loanValue').value);
-   calc.rows.forEach(row=>{
-    if(!(row.manifestQty>0))return;
-    const tr=document.createElement('tr');tr.innerHTML=`<td>${drEscape(row.itemCode)}</td><td>${drEscape(row.itemName)}</td><td>${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)}</td><td>${drFmt(row.amountFC)}</td><td>${drFmt(row.amountLC)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;dr('releaseRows').append(tr);
-   });
-   const units=new Map();calc.rows.forEach(r=>{const group=units.get(r.uom)||{order:0,manifest:0};group.order+=r.ordered;group.manifest+=r.manifestQty;units.set(r.uom,group)});
-   const unitTotal=field=>[...units].map(([unit,q])=>drFmt(q[field])+' '+drEscape(unit)).join('<br>');
-   dr('releaseTotals').innerHTML=`<tr><td colspan="3">Total</td><td>${unitTotal('manifest')}</td><td>${drFmt(calc.totalFC)} ${drEscape(releaseBasis.currency)}</td><td>${drFmt(calc.totalLC)}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
    dr('cashMargin').value=drFmt(calc.cashMargin);dr('usedMargin').value=drFmt(calc.usedMargin);dr('remainingMargin').value=drFmt(calc.remainingCashMargin);dr('margin').value=drFmt(calc.margin);
-   dr('releaseNote').textContent='Standard and actual manifest margins = their total LC margin amounts weighted by PI item value and released quantity. Variance = actual minus standard. Saved releases retain their captured margin amounts.';
+   dr('releaseNote').textContent='Manifest margin is allocated from the total LC cash margin by PI item value and released quantity. Saved releases retain their captured margin amounts.';
   }catch(e){drMessage(e.message,true)}
  }
  dr('loanNote').textContent=dr('loanType').value==='LATR'?'Enter the LATR amount manually in BDT.':'';
