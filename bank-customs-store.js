@@ -57,7 +57,8 @@ const BankCustomsStore={
     return JSON.parse(JSON.stringify(previous));
    }
    if(input.status==='Saved'&&!(Number(row.amount)>0))throw Error('Enter a positive actual amount for '+head.name+'.');
-   return {...row,id:previous?.id||row.id||crypto.randomUUID(),headName:head.name,group:head.group,partyCode:String(row.partyCode).trim(),glStatus:'Unposted'};
+   const party=ExpenseParties.resolve({...row,headName:head.name},previous,{required:true});
+   return {...row,...party,id:previous?.id||row.id||crypto.randomUUID(),headName:head.name,group:head.group,glStatus:'Unposted'};
   });
   if(old?.rows.some(row=>row.glStatus==='Posted'&&!rows.some(r=>r.id===row.id)))throw Error('Posted rows cannot be removed.');
   const result=this.calculate(basis,rows),now=new Date().toISOString();
