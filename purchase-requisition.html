@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><script src="price-units.js"></script>
+<head><script src="price-units.js?v=ltr-kg-pricing-20261019-2"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LC ERP - Purchase Requisition</title>
 <style>
@@ -173,4 +173,4 @@ $('excelFormatBtn').onclick=downloadExcelFormat;$('uploadBtn').onclick=()=>$('up
 $('addRowBtn').onclick=addRow;$('closeModal').onclick=()=>$('modal').classList.remove('open');$('search').oninput=e=>{const q=e.target.value.toLowerCase(),pt=$('productType').value;drawCatalog(catalog.filter(x=>x.active&&x.productType===pt&&[x.code,x.description,x.grade,x.packSize,itemClassification(x).itemCategory,x.category,x.model].some(v=>String(v).toLowerCase().includes(q))))};
 $('saveBtn').onclick=saveDraft;$('confirmBtn').onclick=confirmPlan;$('clearBtn').onclick=clearAll;$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};addRow();
 </script>
-<script src="products.js?v=all-bike-hs-20261018"></script><script src="brand-catalog.js"></script><script src="purchase-store.js"></script><script src="purchase-requisition.js"></script><script src="purchase-test-data.js"></script><script src="purchase-review.js"></script><script src="invoice-store.js"></script><script src="requisition-costs.js"></script><script src="requisition-brand-selection.js"></script><script src="purchase-sidebar.js"></script></body></html>
+<script src="products.js?v=all-bike-hs-20261018"></script><script src="brand-catalog.js"></script><script src="purchase-store.js?v=ltr-kg-pricing-20261019-2"></script><script src="purchase-requisition.js"></script><script src="purchase-test-data.js"></script><script src="purchase-review.js"></script><script src="invoice-store.js?v=ltr-kg-pricing-20261019-2"></script><script src="requisition-costs.js?v=ltr-kg-pricing-20261019-2"></script><script src="requisition-brand-selection.js"></script><script src="purchase-sidebar.js"></script></body></html>
