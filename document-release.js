@@ -12,16 +12,29 @@ function releaseLists(){
  });dr('manifest').value=selected;
  dr('savedRelease').replaceChildren(new Option('Select saved release',''));records.forEach(r=>dr('savedRelease').add(new Option(r.number+' · '+r.manifestNumber+' · '+r.status+' · '+r.glStatus,r.id)));
 }
+function renderManifestDetails(calc){
+ const rows=calc.rows.filter(row=>row.manifestQty>0);
+ rows.forEach(row=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${drEscape(row.itemName)}</td><td>${drFmt(row.ordered)} ${drEscape(row.uom)}</td><td>${drFmt(row.manifestQty)} ${drEscape(row.uom)}</td><td>${row.standardManifestMargin===null?'Not captured':drFmt(row.standardManifestMargin)}</td><td>${drFmt(row.margin)}</td><td class="margin-variance">${row.marginVariance===null?'Not captured':drFmt(row.marginVariance)}</td>`;
+  dr('releaseRows').append(tr);
+ });
+ const units=new Map();rows.forEach(row=>{const quantities=units.get(row.uom)||{ordered:0,manifestQty:0};quantities.ordered+=row.ordered;quantities.manifestQty+=row.manifestQty;units.set(row.uom,quantities)});
+ const quantityTotal=field=>[...units].map(([unit,quantities])=>drFmt(quantities[field])+' '+drEscape(unit)).join('<br>');
+ dr('releaseTotals').innerHTML=`<tr><td>Total</td><td>${quantityTotal('ordered')}</td><td>${quantityTotal('manifestQty')}</td><td>${calc.totalStandardManifestMargin===null?'Not captured':drFmt(calc.totalStandardManifestMargin)}</td><td>${drFmt(calc.margin)}</td><td class="margin-variance">${calc.totalMarginVariance===null?'Not captured':drFmt(calc.totalMarginVariance)}</td></tr>`;
+}
 function renderRelease(){
  const old=releaseId?ReleaseStore.read().find(r=>r.id===releaseId):null;
  const blocked=old?ReleaseStore.blocked(old.id):'',locked=Boolean(old&&(old.glStatus==='Posted'||old.status==='Cancelled'||blocked||!releaseEditing));
  dr('releaseStatus').textContent=releaseEditing?'Editing':releaseStatus;
+ dr('releaseRows').replaceChildren();dr('releaseTotals').replaceChildren();
  if(releaseBasis){
   ['lcNumber','customInvoice','party','currency'].forEach(id=>dr(id).value=releaseBasis[id]||'');
   try{
    const calc=ReleaseStore.calculate(releaseBasis,dr('rate').value,dr('loanType').value,releaseId,dr('loanValue').value);
+   renderManifestDetails(calc);
    dr('cashMargin').value=drFmt(calc.cashMargin);dr('usedMargin').value=drFmt(calc.usedMargin);dr('remainingMargin').value=drFmt(calc.remainingCashMargin);dr('margin').value=drFmt(calc.margin);
-   dr('releaseNote').textContent='Manifest margin is allocated from the total LC cash margin by PI item value and released quantity. Saved releases retain their captured margin amounts.';
+   dr('releaseNote').textContent='Both margins use their total LC margin amounts weighted by PI item value and manifest quantity. Variance = actual minus standard. Saved releases retain their captured margin amounts.';
   }catch(e){drMessage(e.message,true)}
  }
  dr('loanNote').textContent=dr('loanType').value==='LATR'?'Enter the LATR amount manually in BDT.':'';
