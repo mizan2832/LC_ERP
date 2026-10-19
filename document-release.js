@@ -36,16 +36,46 @@ function renderRelease(){
  drFields.forEach(id=>dr(id).disabled=locked);document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.disabled=locked);
  dr('manifest').disabled=Boolean(releaseId);dr('draftRelease').disabled=locked;dr('saveRelease').disabled=locked;
  dr('modifyRelease').disabled=!old||old.glStatus==='Posted'||old.status==='Cancelled'||Boolean(blocked);
+ updateReleaseHistoryButtons();
  dr('modifyRelease').textContent=releaseEditing?'Save Changes':'Modify';dr('cancelRelease').disabled=!old||old.status==='Cancelled'||old.glStatus==='Posted'||Boolean(blocked);
 }
-function loadRelease(record){releaseId=record.id;releaseRevision=record.revision;releaseStatus=record.status;releaseEditing=false;releaseBasis=JSON.parse(JSON.stringify(record.basis));drFields.forEach(id=>dr(id).value=record.header[id]??(id==='loanValue'?record.loanValue??'':''));document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.checked=input.value===record.glStatus);dr('releaseNumber').value=record.number;dr('manifestSearch').value='';releaseLists();dr('manifest').value=record.portReceiptId;renderRelease();drMessage(record.number+' loaded.');}
+function loadRelease(record){releaseId=record.id;releaseRevision=record.revision;releaseStatus=record.status;releaseEditing=false;releaseBasis=JSON.parse(JSON.stringify(record.basis));drFields.forEach(id=>dr(id).value=record.header[id]??(id==='loanValue'?record.loanValue??'':''));document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.checked=input.value===record.glStatus);dr('releaseNumber').value=record.number;dr('manifestSearch').value='';releaseLists();dr('manifest').value=record.portReceiptId;renderRelease();drMessage(record.number+' loaded.');resetReleaseHistory();}
 function saveRelease(status){try{if(!releaseBasis)throw Error('Select a received manifest.');const record=ReleaseStore.save({id:releaseId,status,portReceiptId:releaseBasis.receiptId,header:Object.fromEntries(drFields.map(id=>[id,dr(id).value])),glStatus:document.querySelector('[name="releaseGL"]:checked').value},releaseRevision);loadRelease(record);drMessage(record.number+' saved as '+record.status+'.')}catch(e){drMessage(e.message,true)}}
-function newRelease(){releaseId='';releaseRevision=0;releaseStatus='New';releaseEditing=false;releaseBasis=null;drFields.forEach(id=>dr(id).value='');['releaseNumber','lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin','manifestSearch'].forEach(id=>dr(id).value='');dr('documentType').value='Original';dr('loanType').value='LATR';dr('releaseDate').value=LCDateRules.today();document.querySelector('[name="releaseGL"][value="Unposted"]').checked=true;releaseLists();dr('manifest').value='';renderRelease();drMessage('');}
+function newRelease(){releaseId='';releaseRevision=0;releaseStatus='New';releaseEditing=false;releaseBasis=null;drFields.forEach(id=>dr(id).value='');['releaseNumber','lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin','manifestSearch'].forEach(id=>dr(id).value='');dr('documentType').value='Original';dr('loanType').value='LATR';dr('releaseDate').value=LCDateRules.today();document.querySelector('[name="releaseGL"][value="Unposted"]').checked=true;releaseLists();dr('manifest').value='';renderRelease();drMessage('');resetReleaseHistory();}
 dr('manifestSearch').oninput=()=>{try{releaseLists()}catch(e){drMessage(e.message,true)}};
-dr('manifest').onchange=()=>{try{releaseBasis=dr('manifest').value?ReleaseStore.basis(dr('manifest').value):null;dr('rate').value=releaseBasis?.rate||'';dr('loanValue').value='';if(!releaseBasis)['lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin'].forEach(id=>dr(id).value='');renderRelease();drMessage('')}catch(e){releaseBasis=null;drMessage(e.message,true)}};
+dr('manifest').onchange=()=>{try{releaseBasis=dr('manifest').value?ReleaseStore.basis(dr('manifest').value):null;dr('rate').value=releaseBasis?.rate||'';dr('loanValue').value='';if(!releaseBasis)['lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin'].forEach(id=>dr(id).value='');renderRelease();drMessage('');resetReleaseHistory()}catch(e){releaseBasis=null;drMessage(e.message,true)}};
 dr('rate').oninput=renderRelease;dr('loanType').onchange=renderRelease;dr('newRelease').onclick=newRelease;dr('draftRelease').onclick=()=>saveRelease('Draft');dr('saveRelease').onclick=()=>saveRelease('Released');
 dr('modifyRelease').onclick=()=>{if(releaseEditing){saveRelease(releaseStatus==='Released'?'Released':'Draft');return}releaseEditing=true;renderRelease();drMessage('Modify mode. Update fields, then click Save Changes.');};
 dr('savedRelease').onchange=()=>{try{const r=ReleaseStore.read().find(r=>r.id===dr('savedRelease').value);if(r)loadRelease(r)}catch(e){drMessage(e.message,true)}};
 dr('cancelRelease').onclick=()=>{try{const record=Rollback.cancel(ReleaseStore,releaseId,releaseRevision,id=>ReleaseStore.blocked(id));loadRelease(record);drMessage(record.number+' cancelled. The manifest is available again.')}catch(e){drMessage(e.message,true)}};
 window.addEventListener('storage',event=>{if([ReleaseStore.key,PortStore.key,ExpenseStore.key,LCStore.key,'lc-duty-calculations-v1'].includes(event.key)){releaseLists();renderRelease();drMessage('Related records changed. Reload before saving.',true)}});
+
+// History covers editable form values only; persisted releases are never rolled back.
+let releaseUndo=[],releaseRedo=[],releaseHistoryState=null;
+function releaseFormState(){return {fields:Object.fromEntries(drFields.map(id=>[id,dr(id).value])),gl:document.querySelector('[name="releaseGL"]:checked').value}}
+function updateReleaseHistoryButtons(){
+ const locked=dr('documentType').disabled;
+ dr('undoRelease').disabled=locked||!releaseUndo.length;
+ dr('redoRelease').disabled=locked||!releaseRedo.length;
+}
+function resetReleaseHistory(){releaseUndo=[];releaseRedo=[];releaseHistoryState=releaseFormState();updateReleaseHistoryButtons()}
+function captureReleaseEdit(){
+ if(dr('documentType').disabled)return;
+ const next=releaseFormState();
+ if(JSON.stringify(next)===JSON.stringify(releaseHistoryState))return;
+ if(releaseHistoryState)releaseUndo.push(releaseHistoryState);
+ if(releaseUndo.length>100)releaseUndo.shift();
+ releaseRedo=[];releaseHistoryState=next;updateReleaseHistoryButtons();
+}
+function moveReleaseHistory(source,target){
+ if(dr('documentType').disabled||!source.length)return;
+ target.push(releaseFormState());const state=source.pop();
+ drFields.forEach(id=>dr(id).value=state.fields[id]);
+ document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.checked=input.value===state.gl);
+ releaseHistoryState=state;renderRelease();
+}
+drFields.forEach(id=>dr(id).addEventListener('change',captureReleaseEdit));
+document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.addEventListener('change',captureReleaseEdit));
+dr('undoRelease').onclick=()=>{captureReleaseEdit();moveReleaseHistory(releaseUndo,releaseRedo)};
+dr('redoRelease').onclick=()=>moveReleaseHistory(releaseRedo,releaseUndo);
 newRelease();
