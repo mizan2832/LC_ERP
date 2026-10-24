@@ -31,6 +31,7 @@ const DutyStore={
  validateConfiguredHeads(basis,result,old){for(const row of result.rows){const source=basis.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);for(const head of DUTY_HEADS){if(this.headConfigured(source,head))continue;const actual=row.heads[head.id].actual,previous=old?.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom)?.heads?.[head.id]?.actual;if(Number(actual)>0&&(!old||Number(previous)!==Number(actual)))throw Error(row.itemCode+': '+head.name+' is not configured in the saved LC standard. Cancel downstream entries in reverse order and cancel/recreate the LC opening to use a new standard.')}}},
  read(){const records=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(records))throw Error('Invalid duty calculation storage.');return records},
  round(v){return Math.round((v+Number.EPSILON)*100)/100},
+ boeExists(number,excludingId=''){const normalized=String(number||'').trim().toUpperCase();return Boolean(normalized)&&this.read().some(record=>record.id!==excludingId&&String(record.header?.boeNumber||'').trim().toUpperCase()===normalized)},
  orderValue(row){return this.round(this.number(row.qty,'manifest quantity')*this.number(row.rate,'PI item rate per order unit'))},
  number(value,label){const n=Number(value);if(value===''||value===null||value===undefined||!Number.isFinite(n)||n<0)throw Error('Enter a non-negative '+label+'.');return n},
  blocked(id){return Rollback.active('lc-bank-customs-expenses-v1',r=>r.dutyCalculationId===id)?'Bank & customs expense entry exists.':''},
@@ -94,14 +95,18 @@ const DutyStore={
   if(records.some(r=>r.id!==input.id&&r.portReceiptId===release.portReceiptId&&r.status!=='Cancelled'))throw Error('Duty calculation already exists for this manifest.');
   const basis=this.orderStandards(old?.basis||this.basis(release.id));
   const date=input.header.costDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<release.header.releaseDate)throw Error('Costing date must be valid and on or after document release date.');
+  const boeNumber=String(input.header.boeNumber||'').trim();
+  if(!boeNumber)throw Error('Enter the Bill of Entry number.');
+  if(this.boeExists(boeNumber,input.id))throw Error('This Bill of Entry number already exists. Enter a unique BOE number.');
+  if(!input.header.boeDate)throw Error('Enter the Bill of Entry date.');
+  if(!DUTY_PARTIES.some(p=>p.id===input.header.dutyParty))throw Error('Select the Duty party.');
+  if(!CNF_PARTIES.some(p=>p.id===input.header.cnfParty))throw Error('Select the C&F party.');
   if(input.status==='Saved'){
-   if(!DUTY_PARTIES.some(p=>p.id===input.header.dutyParty)||!CNF_PARTIES.some(p=>p.id===input.header.cnfParty))throw Error('Select duty party and C&F party.');
-   if(!input.header.boeNumber||!input.header.boeDate)throw Error('Enter Bill of Entry number and date.');
    if(!basis.rows.every(r=>r.standardSnapshot))throw Error('Saved standard cost snapshot is missing for one or more manifest items.');
   }
   if(input.header.boeDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(input.header.boeDate)||!Number.isFinite(Date.parse(input.header.boeDate+'T00:00:00Z'))||new Date(input.header.boeDate+'T00:00:00Z').toISOString().slice(0,10)!==input.header.boeDate||input.header.boeDate>date))throw Error('Bill of Entry date must be valid and no later than costing date.');
   const result=this.calculate(basis,input.rows,input.header.rate);this.validateConfiguredHeads(basis,result,old);if(input.status==='Saved'&&result.totalAV===null)throw Error('Enter the actual assessable value for every manifest item.');if(input.status==='Saved'&&result.totalActual===null)throw Error('Enter an actual value for every duty head. Enter 0 for heads that do not apply.');const now=new Date().toISOString();
-  const record={...input,...result,basis,portReceiptId:release.portReceiptId,manifestNumber:basis.manifestNumber,lcOpeningId:basis.lcOpeningId,id:input.id||crypto.randomUUID(),number:old?.number||'DUTY-'+String(records.reduce((max,r)=>Math.max(max,Number(String(r.number).replace('DUTY-',''))||0),0)+1).padStart(6,'0'),revision:(revision||0)+1,updatedAt:now,history:old?[...(old.history||[]),{action:'Modified',at:now,before:{header:old.header,rows:old.rows},after:{header:input.header,rows:result.rows}}]:[]};
+  const record={...input,header:{...input.header,boeNumber},...result,basis,portReceiptId:release.portReceiptId,manifestNumber:basis.manifestNumber,lcOpeningId:basis.lcOpeningId,id:input.id||crypto.randomUUID(),number:old?.number||'DUTY-'+String(records.reduce((max,r)=>Math.max(max,Number(String(r.number).replace('DUTY-',''))||0),0)+1).padStart(6,'0'),revision:(revision||0)+1,updatedAt:now,history:old?[...(old.history||[]),{action:'Modified',at:now,before:{header:old.header,rows:old.rows},after:{header:input.header,rows:result.rows}}]:[]};
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  }
 };

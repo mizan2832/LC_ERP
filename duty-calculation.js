@@ -28,7 +28,14 @@ function dutyTotals(){
   dt('saveDuty').disabled=dutyLocked()||result.totalActual===null||result.totalAV===null;dt('draftDuty').disabled=dutyLocked();
  }catch(error){dutyMessage(error.message,true);dt('saveDuty').disabled=true;dt('draftDuty').disabled=true}
 }
+function syncDutyHeaderValidation(){
+ const duplicate=DutyStore.boeExists(dt('boeNumber').value,dutyId);
+ dt('boeNumber').setCustomValidity(duplicate?'This Bill of Entry number already exists. Enter a unique BOE number.':dt('boeNumber').value&&!dt('boeNumber').value.trim()?'Enter the Bill of Entry number.':'');
+ dt('boeDate').max=dt('costDate').value||'';
+}
+['boeNumber','boeDate','costDate'].forEach(id=>dt(id).addEventListener('input',syncDutyHeaderValidation));
 function renderDuty(){
+ syncDutyHeaderValidation();
  const locked=dutyLocked();dt('dutyStatus').textContent=dutyEditing?'Editing':dutyStatus;dt('dutyRows').replaceChildren();dt('dutyFoot').replaceChildren();
  if(dutyBasis){
   ['manifestDate','releaseNumber','lcNumber','lcDate','poInfo','piInfo','currency','party','customInvoice','commercialInvoice','commercialDate'].forEach(id=>dt(id).value=dutyBasis[id]||'');dt('manifestQty').value=dutyQuantityLabel(dutyBasis.rows);dt('lcQty').value=dutyQuantityLabel(dutyBasis.orderQuantities);dt('hsCodes').value=[...new Set(dutyBasis.rows.map(r=>r.hs))].join(', ');
@@ -60,7 +67,7 @@ function dutyRowsAsTotals(basis,rows,rate){
  }))}));
 }
 function loadDuty(record){dutyId=record.id;dutyRevision=record.revision;dutyStatus=record.status;dutyEditing=false;dutyBasis=JSON.parse(JSON.stringify(record.basis));dutyRows=JSON.parse(JSON.stringify(record.rows));dutyFields.forEach(id=>dt(id).value=record.header[id]||'');dutyRows=dutyRowsAsTotals(dutyBasis,dutyRows,record.header.rate);dutyBasis=DutyStore.orderStandards(dutyBasis);dt('dutyNumber').value=record.number;dt('manifestSearch').value='';dutyLists();dt('manifest').value=record.documentReleaseId;renderDuty();dutyMessage(record.number+' loaded. Click Modify to update.');}
-function saveDuty(status){try{if(!dutyBasis||dutyLocked())throw Error('Select an editable duty calculation.');const record=DutyStore.save({id:dutyId,documentReleaseId:dutyBasis.documentReleaseId,status,header:Object.fromEntries(dutyFields.map(id=>[id,dt(id).value])),rows:dutyRows},dutyRevision);loadDuty(record);dutyMessage(record.number+' saved as '+record.status+'.');}catch(error){dutyMessage(error.message,true)}}
+function saveDuty(status){try{if(!dutyBasis||dutyLocked())throw Error('Select an editable duty calculation.');syncDutyHeaderValidation();for(const id of ['boeNumber','boeDate','dutyParty','cnfParty'])if(!dt(id).reportValidity())return;const record=DutyStore.save({id:dutyId,documentReleaseId:dutyBasis.documentReleaseId,status,header:Object.fromEntries(dutyFields.map(id=>[id,dt(id).value])),rows:dutyRows},dutyRevision);loadDuty(record);dutyMessage(record.number+' saved as '+record.status+'.');}catch(error){dutyMessage(error.message,true)}}
 function drawDutyPicker(){try{const query=dt('dutySearch').value.toLowerCase();dt('dutyChoices').replaceChildren();DutyStore.read().filter(r=>[r.number,r.manifestNumber,r.basis.lcNumber].join(' ').toLowerCase().includes(query)).forEach(record=>{const button=document.createElement('button');button.textContent=record.number+' · '+record.manifestNumber+' · LC '+record.basis.lcNumber+' · '+record.status;button.onclick=()=>{try{const current=DutyStore.read().find(r=>r.id===record.id);if(!current)throw Error('Duty record no longer exists.');loadDuty(current);dt('dutyPicker').close()}catch(error){dutyMessage(error.message,true)}};dt('dutyChoices').append(button)});if(!dt('dutyChoices').children.length)dt('dutyChoices').textContent='No matching saved duty calculations.';}catch(error){dutyMessage(error.message,true)}}
 function openDutyPicker(){dt('dutySearch').value='';drawDutyPicker();dt('dutyPicker').showModal();dt('dutySearch').focus()}
 dt('dutyNumber').ondblclick=openDutyPicker;dt('dutyNumber').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();openDutyPicker()}};dt('closeDutyPicker').onclick=()=>dt('dutyPicker').close();dt('dutySearch').oninput=drawDutyPicker;
