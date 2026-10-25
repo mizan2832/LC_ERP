@@ -10,11 +10,12 @@ function rememberStandardHeads(){
 function standardRowHasCost(row){return Boolean($('i-'+row.id)?.checked)&&Number($('v-'+row.id)?.value)>0}
 function standardRowVisible(row){if(/assembl/i.test(row.name))return false;return Boolean($('i-'+row.id)?.checked)&&(standardRowHasCost(row)||chosenStandardHeads.has(row.id))}
 function standardHeadChoices(key,currentId=''){
+ if(key==='insurance')key='bank';
  const names=new Set(),choices=[];
  // Prefer the definitions already loaded in this setup when custom IDs differ.
- [...rows,...standardHeadCatalog.values()].filter(row=>row.key===key&&!/assembl/i.test(row.name)).forEach(row=>{
+ [...rows,...standardHeadCatalog.values()].filter(row=>(row.key===key||key==='bank'&&row.key==='insurance')&&!/assembl/i.test(row.name)).forEach(row=>{
   const name=row.name.trim().toLowerCase();if(names.has(name))return;names.add(name);
-  const occupied=rows.some(other=>other.key===key&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
+  const occupied=rows.some(other=>(other.key===key||key==='bank'&&other.key==='insurance')&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
   choices.push({...row,disabled:occupied});
  });return choices;
 }
@@ -29,7 +30,7 @@ function refreshStandardHeadSelects(){
 function installStandardHeadSelect(row){
  const tr=$('v-'+row.id)?.closest('tr');if(!tr||tr.querySelector('[data-standard-head]'))return;
  const cell=tr.cells[0],hint=cell.querySelector('small');
- const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=row.key;
+ const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=row.key==='insurance'?'bank':row.key;
  select.setAttribute('aria-label','Cost head in '+row.key);fillStandardHeadSelect(select,row.key,row.id);
  cell.replaceChildren(select);if(hint)cell.append(hint);
  select.onchange=()=>{
@@ -47,7 +48,7 @@ function refreshStandardRowVisibility(){
  rows.forEach(row=>{const tr=$('v-'+row.id)?.closest('tr');if(tr)tr.hidden=!standardRowVisible(row)});
  groups.forEach(([key])=>{
   const section=$('sub-'+key).parentElement,empty=section.querySelector('.empty-standard-heads');
-  if(empty)empty.hidden=rows.some(r=>r.key===key&&standardRowVisible(r))||Boolean(section.querySelector('.pending-standard-head'));
+  if(empty)empty.hidden=rows.some(r=>(r.key===key||key==='bank'&&r.key==='insurance')&&standardRowVisible(r))||Boolean(section.querySelector('.pending-standard-head'));
  });
 }
 function resetStandardRowSelection(){
