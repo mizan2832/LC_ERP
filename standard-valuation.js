@@ -1,12 +1,9 @@
 function normalizeStandardValuation(data){
- const copy={...data,fields:{...data.fields},costs:(data.costs||[]).map(cost=>({...cost}))},f=copy.fields,c=data.calculation||{},rate=Number(f.cfx??f.fx),legacy=(c.valuationVersion||0)<5;
- if(f.cfx===undefined)f.cfx=f.fx||'';
+ const copy={...data,fields:{...data.fields},costs:(data.costs||[]).map(cost=>({...cost}))},f=copy.fields,c=data.calculation||{};
  if(!['LC','LC+TT','TT'].includes(f.lcType))f.lcType='LC';
- if(f.landingBDT===undefined)f.landingBDT=c.landingCharge??(Number(c.cifValue||0)*Number(f.landingPercent||0)/100);
- if(f.psiBDT===undefined)f.psiBDT=c.psiAssessableValue??Number(f.psiAV||0);
- if(legacy&&f.assUsd===undefined&&rate>0){
-  const base=c.cifValue??(c.customsAssessableValue!==undefined?Number(c.customsAssessableValue)-Number(f.landingBDT||0)-Number(f.psiBDT||0):null);
-  f.assUsd=base===null?'':Math.max(0,Number(base)/rate);
+ if(f.totalAssessableBDT===undefined){
+  const saved=c.customsAssessableValue;
+  f.totalAssessableBDT=saved!==undefined&&saved!==null?saved:f.assUsd!==undefined&&f.assUsd!==''?Number(f.assUsd)*Number(f.cfx??f.fx??0)+Number(f.landingBDT??c.landingCharge??0)+Number(f.psiBDT??c.psiAssessableValue??0):'';
  }
  // Convert an old foreign-currency freight input to a BDT order-unit head in memory.
  const freight=Number(f.freight||0),fx=Number(f.fx||0),unit=String(f.unit||'').toUpperCase();

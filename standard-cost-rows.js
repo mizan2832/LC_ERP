@@ -27,8 +27,22 @@ function fillStandardHeadSelect(select,key,currentId=''){
 function refreshStandardHeadSelects(){
  document.querySelectorAll('[data-standard-head]').forEach(select=>fillStandardHeadSelect(select,select.dataset.group,select.dataset.standardHead));
 }
+function appendStandardDelete(tr,label,onDelete){
+ const cell=document.createElement('td');cell.className='standard-cost-action';
+ const button=document.createElement('button');button.type='button';button.className='standard-cost-delete';button.textContent='Delete';button.setAttribute('aria-label','Delete '+label);button.dataset.standardDelete='';button.onclick=onDelete;
+ cell.append(button);tr.append(cell);
+}
+function installStandardDelete(row,tr){
+ if(tr.querySelector('[data-standard-delete]'))return;
+ // Keep stable calculation controls so dependent duties and saved versions remain valid.
+ tr.cells[4]?.querySelectorAll('button').forEach(button=>button.remove());
+ appendStandardDelete(tr,row.name,()=>{
+  $('v-'+row.id).value=0;$('i-'+row.id).checked=false;chosenStandardHeads.delete(row.id);
+  calc();refreshStandardHeadSelects();showSetupStatus(currentSetupNumber?'Editing':'New');
+ });
+}
 function installStandardHeadSelect(row){
- const tr=$('v-'+row.id)?.closest('tr');if(!tr||tr.querySelector('[data-standard-head]'))return;
+ const tr=$('v-'+row.id)?.closest('tr');if(!tr)return;installStandardDelete(row,tr);if(tr.querySelector('[data-standard-head]'))return;
  const cell=tr.cells[0],hint=cell.querySelector('small');
  const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=row.key==='insurance'?'bank':row.key;
  select.setAttribute('aria-label','Cost head in '+row.key);fillStandardHeadSelect(select,row.key,row.id);
@@ -59,6 +73,7 @@ function addStandardCostRow(key){
  const section=$('sub-'+key).parentElement,tr=document.createElement('tr');tr.className='pending-standard-head';
  const cell=document.createElement('td'),select=document.createElement('select');select.dataset.standardHead='';select.dataset.group=key;select.setAttribute('aria-label','Select new cost head for '+key);fillStandardHeadSelect(select,key);cell.append(select);tr.append(cell);
  for(let i=0;i<4;i++){const td=document.createElement('td');td.textContent=i===0?'Select a cost head first':'';tr.append(td)}
+ appendStandardDelete(tr,'empty cost row',()=>{tr.remove();refreshStandardRowVisibility();refreshStandardHeadSelects()});
  section.querySelector('tbody').append(tr);refreshStandardRowVisibility();select.focus();
  select.onchange=()=>{
   const id=select.value,target=standardHeadCatalog.get(id)||rows.find(r=>r.id===id);
@@ -70,6 +85,7 @@ function addStandardCostRow(key){
 rememberStandardHeads();
 groups.forEach(([key])=>{
  const section=$('sub-'+key).parentElement,head=section.querySelector('.sectionhead');
+ const action=document.createElement('th');action.textContent='Action';action.className='standard-cost-action';section.querySelector('thead tr').append(action);
  const add=document.createElement('button');add.type='button';add.textContent='+ Add Row';add.onclick=()=>addStandardCostRow(key);head.append(add);
  const empty=document.createElement('p');empty.className='empty-standard-heads muted';empty.textContent='No costing rows selected. Click Add Row to choose a cost head.';section.insertBefore(empty,$('sub-'+key));
  const oldControls=section.querySelector('.addhead');
