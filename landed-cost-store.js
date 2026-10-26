@@ -2,6 +2,11 @@ const LandedStore={
  key:'lc-landed-costs-v1',
  read(){const rows=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(rows))throw Error('Invalid landed cost storage.');return rows},
  round(n){return Math.round((n+Number.EPSILON)*100)/100},
+ standardTTParty(basis){
+  const relevant=basis.rows.filter(row=>Number(row.standardSnapshot?.fields?.tt)>0);
+  if(!relevant.length||relevant.some(row=>!String(row.standardSnapshot?.fields?.ttParty||'').trim()))return '';
+  const parties=[...new Set(relevant.map(row=>String(row.standardSnapshot.fields.ttParty).trim()))];return parties.length===1?parties[0]:'';
+ },
  paymentMode(basis){return basis.paymentMode||LCStore.read().find(r=>r.id===basis.lcOpeningId)?.header.pay||''},
  blocked(id){return Rollback.active('lc-finished-goods-receipts-v1',r=>r.landedCostId===id)?'Finished goods receive entry exists.':''},
  basis(bankId){
@@ -84,6 +89,7 @@ const LandedStore={
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<basis.sourceDate)throw Error('Enter a valid cost date on or after Bank & Customs expense date.');
   if(input.ttInput){input={...input,extras:this.allocateTT(basis,input.extras,input.ttInput),ttInput:{total:this.round(Number(input.ttInput.total)),party:String(input.ttInput.party||'').trim(),method:'Invoice value weighted'}}}
   if(input.status==='Saved'&&this.paymentMode(basis)==='L/C + TT'&&!input.extras.some(row=>Number(row.tt)>0))throw Error('LC payment mode is L/C + TT. Enter a positive TT amount before saving landed cost.');
+  input.extras.forEach(row=>{if(Number(row.tt)>0&&!String(row.ttParty||'').trim())throw Error('Select a TT party for '+row.itemCode+'.')});
   if(input.status==='Saved')input.extras.forEach(row=>{if(Number(row.tt)>0&&!String(row.ttParty||'').trim())throw Error('TT party code is required for '+row.itemCode);if(Number(row.assembly)>0&&!String(row.assemblyParty||'').trim())throw Error('Assembly party code is required for '+row.itemCode)});
   if(!old){const fresh=this.basis(bank.id);if(JSON.stringify(fresh.sourceVersions)!==JSON.stringify(input.sourceVersions))throw Error('Source costs changed. Reselect the manifest before saving.')}
   const result=this.calculate(basis,input.extras),now=new Date().toISOString();
