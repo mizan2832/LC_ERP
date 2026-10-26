@@ -1,4 +1,11 @@
 // Keep calculation inputs and stable head IDs; show only chosen costing rows.
+// Share one editor while retaining historical port/cf keys for saved snapshots.
+const portExpenseSection=$('sub-port').parentElement;
+const cfExpenseSection=$('sub-cf').parentElement;
+portExpenseSection.querySelector('h2').lastChild.textContent='Port, C & F Expenses';
+portExpenseSection.querySelector('tbody').append(...cfExpenseSection.querySelector('tbody').children);
+$('sub-cf').hidden=true;portExpenseSection.append($('sub-cf'));cfExpenseSection.remove();
+const standardEditorGroup=key=>key==='cf'?'port':key==='insurance'?'bank':key;
 const chosenStandardHeads=new Set();
 const standardHeadCatalog=new Map();
 function rememberStandardHeads(){
@@ -10,12 +17,12 @@ function rememberStandardHeads(){
 function standardRowHasCost(row){return Boolean($('i-'+row.id)?.checked)&&Number($('v-'+row.id)?.value)>0}
 function standardRowVisible(row){if(/assembl/i.test(row.name))return false;return Boolean($('i-'+row.id)?.checked)&&(standardRowHasCost(row)||chosenStandardHeads.has(row.id))}
 function standardHeadChoices(key,currentId=''){
- if(key==='insurance')key='bank';
+ key=standardEditorGroup(key);
  const names=new Set(),choices=[];
  // Prefer the definitions already loaded in this setup when custom IDs differ.
- [...rows,...standardHeadCatalog.values()].filter(row=>(row.key===key||key==='bank'&&row.key==='insurance')&&!/assembl/i.test(row.name)).forEach(row=>{
+ [...rows,...standardHeadCatalog.values()].filter(row=>standardEditorGroup(row.key)===key&&!/assembl/i.test(row.name)).forEach(row=>{
   const name=row.name.trim().toLowerCase();if(names.has(name))return;names.add(name);
-  const occupied=rows.some(other=>(other.key===key||key==='bank'&&other.key==='insurance')&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
+  const occupied=rows.some(other=>standardEditorGroup(other.key)===key&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
   choices.push({...row,disabled:occupied});
  });return choices;
 }
@@ -23,6 +30,7 @@ function fillStandardHeadSelect(select,key,currentId=''){
  select.replaceChildren(new Option('Select cost head…',''));
  standardHeadChoices(key,currentId).forEach(row=>{const option=new Option(row.name,row.id);option.disabled=row.disabled;select.add(option)});
  select.value=currentId;
+ if(window.installStandardHeadPicker&&select.isConnected)window.installStandardHeadPicker(select);
 }
 function refreshStandardHeadSelects(){
  document.querySelectorAll('[data-standard-head]').forEach(select=>fillStandardHeadSelect(select,select.dataset.group,select.dataset.standardHead));
@@ -44,9 +52,9 @@ function installStandardDelete(row,tr){
 function installStandardHeadSelect(row){
  const tr=$('v-'+row.id)?.closest('tr');if(!tr)return;installStandardDelete(row,tr);if(tr.querySelector('[data-standard-head]'))return;
  const cell=tr.cells[0],hint=cell.querySelector('small');
- const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=row.key==='insurance'?'bank':row.key;
+ const select=document.createElement('select');select.dataset.standardHead=row.id;select.dataset.group=standardEditorGroup(row.key);
  select.setAttribute('aria-label','Cost head in '+row.key);fillStandardHeadSelect(select,row.key,row.id);
- cell.replaceChildren(select);if(hint)cell.append(hint);
+ cell.replaceChildren(select);if(hint)cell.append(hint);if(window.installStandardHeadPicker)window.installStandardHeadPicker(select);
  select.onchange=()=>{
   const targetId=select.value;if(!targetId||targetId===row.id){select.value=row.id;return}
   const target=standardHeadCatalog.get(targetId)||rows.find(r=>r.id===targetId);
@@ -60,9 +68,9 @@ function installStandardHeadSelect(row){
 }
 function refreshStandardRowVisibility(){
  rows.forEach(row=>{const tr=$('v-'+row.id)?.closest('tr');if(tr)tr.hidden=!standardRowVisible(row)});
- groups.forEach(([key])=>{
+ groups.filter(([key])=>key!=='cf').forEach(([key])=>{
   const section=$('sub-'+key).parentElement,empty=section.querySelector('.empty-standard-heads');
-  if(empty)empty.hidden=rows.some(r=>(r.key===key||key==='bank'&&r.key==='insurance')&&standardRowVisible(r))||Boolean(section.querySelector('.pending-standard-head'));
+  if(empty)empty.hidden=rows.some(r=>standardEditorGroup(r.key)===key&&standardRowVisible(r))||Boolean(section.querySelector('.pending-standard-head'));
  });
 }
 function resetStandardRowSelection(){
@@ -74,7 +82,7 @@ function addStandardCostRow(key){
  const cell=document.createElement('td'),select=document.createElement('select');select.dataset.standardHead='';select.dataset.group=key;select.setAttribute('aria-label','Select new cost head for '+key);fillStandardHeadSelect(select,key);cell.append(select);tr.append(cell);
  for(let i=0;i<4;i++){const td=document.createElement('td');td.textContent=i===0?'Select a cost head first':'';tr.append(td)}
  appendStandardDelete(tr,'empty cost row',()=>{tr.remove();refreshStandardRowVisibility();refreshStandardHeadSelects()});
- section.querySelector('tbody').append(tr);refreshStandardRowVisibility();select.focus();
+ section.querySelector('tbody').append(tr);if(window.installStandardHeadPicker)window.installStandardHeadPicker(select);refreshStandardRowVisibility();(select.nextElementSibling?.querySelector('button')||select).focus();
  select.onchange=()=>{
   const id=select.value,target=standardHeadCatalog.get(id)||rows.find(r=>r.id===id);
   if(!target||standardHeadChoices(key).find(r=>r.id===id)?.disabled)return;
@@ -83,7 +91,7 @@ function addStandardCostRow(key){
  };
 }
 rememberStandardHeads();
-groups.forEach(([key])=>{
+groups.filter(([key])=>key!=='cf').forEach(([key])=>{
  const section=$('sub-'+key).parentElement,head=section.querySelector('.sectionhead');
  const action=document.createElement('th');action.textContent='Action';action.className='standard-cost-action';section.querySelector('thead tr').append(action);
  const add=document.createElement('button');add.type='button';add.textContent='+ Add Row';add.onclick=()=>addStandardCostRow(key);head.append(add);
