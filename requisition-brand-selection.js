@@ -6,12 +6,12 @@
  const draw=drawCatalog;drawCatalog=function(items){draw(items.filter(matches))};
  const open=openItems;openItems=function(id){if(!brand.value||!category.value)return notify('Select Brand and Category before selecting an item.','err');open(id)};
  const selectItem=pick;pick=function(code){const item=catalog.find(r=>r.code===code);if(!item||!matches(item))return notify('Select an item from the chosen Brand and Category.','err');selectItem(code)};
- function change(){if(approved)return;const type=brand.value==='Goodyear'?'Lubricant':'Finished Good';$('productType').value=category.value?type:'';$('productType').onchange();}
- brand.onchange=()=>{categories();change()};category.onchange=change;
+ function change(resetItems=false){if(approved)return;const type=brand.value==='Goodyear'?'Lubricant':'Finished Good';$('productType').value=category.value?type:'';if(resetItems){$('productType').onchange();return}render();notify('Category changed. Existing items are retained; the item list now shows the selected category.')}
+ brand.onchange=()=>{categories();change(true)};category.onchange=()=>change();
  const lock=applyLock;applyLock=function(){lock();category.disabled=approved||!brand.value};
  const load=loadPr;loadPr=function(record){const savedBrand=record.header.brand;if(savedBrand&&![...brand.options].some(o=>o.value===savedBrand))brand.add(new Option(savedBrand+' (saved)',savedBrand));categories();const savedCategory=record.header.itemCategory;if(savedCategory&&![...category.options].some(o=>o.value===savedCategory))category.add(new Option(savedCategory,savedCategory));load(record);if(BRAND_CATEGORIES[brand.value]){categories(savedCategory||itemClassification(record.rows.find(r=>r.item)?.item||{}).itemCategory)}category.disabled=approved||!brand.value};
  const clear=clearAll;clearAll=function(){clear();categories()};$('clearBtn').onclick=clearAll;$('newPr').onclick=clearAll;
- const validateSelection=validate;validate=function(){const error=validateSelection();if(error)return error;if(!BRAND_CATEGORIES[brand.value]||!category.value)return 'Select Brand and Category.';if(rows.some(r=>r.item&&!matches(r.item)))return 'Every item must belong to the selected Brand and Category.';return ''};
- $('callout').textContent='Select Brand, then Category. Add an item row and open its searchable item list. Only items for the selected brand and category are shown.';
+ const validateSelection=validate;validate=function(){const error=validateSelection();if(error)return error;if(!BRAND_CATEGORIES[brand.value]||!category.value)return 'Select Brand and Category.';if(rows.some(r=>r.item&&itemClassification(r.item).brand!==brand.value))return 'Every item must belong to the selected Brand.';return ''};
+ $('callout').textContent='Select Brand, then Category. Add an item row and open its searchable item list. Only items for the selected brand and category are shown. You can add items from different categories of the same brand; changing category keeps existing rows.';
  categories();
 })();
