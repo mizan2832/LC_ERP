@@ -16,6 +16,10 @@ const BankCustomsStore={
   [...ExpenseHeadCatalog,...ExpenseStore.standards().flatMap(s=>s.costs||[]),...basis.rows.flatMap(row=>row.standardSnapshot?.costs||[])].filter(cost=>BANK_CUSTOMS_GROUPS[cost.key]).forEach(cost=>found.set(ExpenseStore.headKey(cost),{headKey:ExpenseStore.headKey(cost),name:cost.name,group:cost.key}));
   return [...found.values()].sort((a,b)=>a.group.localeCompare(b.group)||a.name.localeCompare(b.name));
  },
+ initialRows(basis){
+  const included=new Set(basis.rows.flatMap(row=>row.standardSnapshot?.costs||[]).filter(cost=>cost.included&&BANK_CUSTOMS_GROUPS[cost.key]).map(cost=>ExpenseStore.headKey(cost)));
+  return this.heads(basis).filter(head=>included.has(head.headKey)).map(head=>({id:crypto.randomUUID(),headKey:head.headKey,headName:head.name,group:head.group,amount:'',partyCode:'',partyName:'',glStatus:'Unposted'}));
+ },
  checks(basis,headKey){
   const normalize=u=>PriceUnits.normalize(u);
   return basis.rows.map(row=>{
