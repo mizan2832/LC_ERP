@@ -13,20 +13,18 @@ const BankCustomsStore={
  },
  heads(basis){
   const found=new Map();
-  basis.rows.forEach(row=>{const setup=row.standardSnapshot;(setup?.costs||[]).filter(c=>BANK_CUSTOMS_GROUPS[c.key]&&c.included).forEach(cost=>{
-   const amount=Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN));
-   if(Number.isFinite(amount)&&amount>0)found.set(ExpenseStore.headKey(cost),{headKey:ExpenseStore.headKey(cost),name:cost.name,group:cost.key});
-  })});return [...found.values()].sort((a,b)=>a.group.localeCompare(b.group)||a.name.localeCompare(b.name));
+  [...ExpenseHeadCatalog,...ExpenseStore.standards().flatMap(s=>s.costs||[]),...basis.rows.flatMap(row=>row.standardSnapshot?.costs||[])].filter(cost=>BANK_CUSTOMS_GROUPS[cost.key]).forEach(cost=>found.set(ExpenseStore.headKey(cost),{headKey:ExpenseStore.headKey(cost),name:cost.name,group:cost.key}));
+  return [...found.values()].sort((a,b)=>a.group.localeCompare(b.group)||a.name.localeCompare(b.name));
  },
  checks(basis,headKey){
   const normalize=u=>PriceUnits.normalize(u);
   return basis.rows.map(row=>{
    const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>BANK_CUSTOMS_GROUPS[c.key]&&c.included&&ExpenseStore.headKey(c)===headKey);
-   const amount=cost?Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN)):NaN;
+   const amount=cost?Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN)):0;
    // BDT expense standards are per order unit; only FOB pricing converts LTR/KG.
    const factor=1;
-   const valid=Number.isFinite(amount)&&amount>0&&Number.isFinite(factor)&&factor>0&&Number.isFinite(Number(row.qty))&&Number(row.qty)>0;
-   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,valid,unitStandard:valid?amount:null,standardQty:valid?Number(row.qty)*factor:null,standardUom:normalize(row.uom),standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:valid?'':row.itemCode+': no positive saved standard for this cost head or unit mapping is missing.'};
+   const valid=Number.isFinite(amount)&&amount>=0&&Number.isFinite(factor)&&factor>0&&Number.isFinite(Number(row.qty))&&Number(row.qty)>0;
+   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,missingStandard:!cost,valid,unitStandard:valid?amount:null,standardQty:valid?Number(row.qty)*factor:null,standardUom:normalize(row.uom),standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:!cost?row.itemCode+': no captured standard for this head; standard is 0 BDT.':valid?'':row.itemCode+': invalid saved standard amount or manifest quantity.'};
   });
  },
  standardTotal(basis,headKey){const checks=this.checks(basis,headKey);if(checks.some(c=>!c.valid))throw Error(checks.filter(c=>!c.valid).map(c=>c.message).join(' '));return this.round(checks.reduce((sum,c)=>sum+c.total,0))},
@@ -49,7 +47,7 @@ const BankCustomsStore={
   const seen=new Set(),heads=this.heads(basis);
   const rows=input.rows.map(row=>{
    if(!row.headKey||seen.has(row.headKey))throw Error('Select a unique cost head for each row.');seen.add(row.headKey);
-   const head=heads.find(h=>h.headKey===row.headKey);if(!head)throw Error('Only positive Port, C&F and Transport standard cost heads are allowed.');
+   const head=heads.find(h=>h.headKey===row.headKey);if(!head)throw Error('Select an available Port, C&F or Transport cost head.');
    if(!String(row.partyCode||'').trim())throw Error('Party code is mandatory for '+head.name+'.');
    const previous=old?.rows.find(r=>r.id===row.id);
    if(previous?.glStatus==='Posted'){
