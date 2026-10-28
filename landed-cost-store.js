@@ -1,9 +1,12 @@
 const LandedStore={
  key:'lc-landed-costs-v1',
  read(){const rows=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(rows))throw Error('Invalid landed cost storage.');return rows},
+ isCashMargin(cost){const key=String(cost.headKey||cost.key||'').replace(/^head:/,'').split('|')[0];return StandardCostMath.isMargin({id:cost.id,key,name:cost.headName||cost.name||''})},
  round(n){return Math.round((n+Number.EPSILON)*100)/100},
+ includesStandardTT(setup){const type=String(setup?.fields?.lcType||'').trim().toUpperCase();return type?type!=='TT':setup?.calculation?.ttIncluded!==false},
+ standardTTAmount(row){return this.includesStandardTT(row.standardSnapshot)?Number(row.standardTT||0):0},
  standardTTParty(basis){
-  const relevant=basis.rows.filter(row=>Number(row.standardSnapshot?.fields?.tt)>0);
+  const relevant=basis.rows.filter(row=>this.includesStandardTT(row.standardSnapshot)&&Number(row.standardSnapshot?.fields?.tt)>0);
   if(!relevant.length||relevant.some(row=>!String(row.standardSnapshot?.fields?.ttParty||'').trim()))return '';
   const parties=[...new Set(relevant.map(row=>String(row.standardSnapshot.fields.ttParty).trim()))];return parties.length===1?parties[0]:'';
  },
@@ -26,15 +29,16 @@ const LandedStore={
    add('fob','PI FOB / invoice value','Invoice',Number(row.amountLC),Number(setup.fields.pi)*Number(setup.fields.fx)*factor*qty);
    const dutyRow=duty.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);if(!dutyRow)throw Error('Duty SKU missing: '+row.itemCode);
    if(Number(setup.fields.freight)>0)add('freight','Freight (legacy input)','Duty valuation input',Number(dutyRow.freight)*Number(bank.basis.rate)*qty,Number(setup.fields.freight)*Number(setup.fields.fx)*factor*qty);
-   (setup.costs||[]).filter(c=>c.included&&!/assembl/i.test(c.name)&&!(setup.calculation?.marginIncludedInLandedCost===false&&StandardCostMath.isMargin(c))).forEach(cost=>{
+   (setup.costs||[]).filter(c=>c.included&&!/assembl/i.test(c.name)&&!StandardCostMath.isMargin(c)).forEach(cost=>{
     const amount=Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN));
     if(!Number.isFinite(amount))throw Error(row.itemCode+': calculated standard missing for '+cost.name);
     if(amount>0)add('head:'+ExpenseStore.headKey(cost),cost.name,'Standard setup',0,amount*qty*StandardCostMath.factor(setup,row));
    });
    const assembly=0;
-   return {...row,qty,stockQty,standardFactor:factor,costs,standardTT:this.round(Number(setup.fields.tt||0)*Number(setup.fields.ttfx||0)*factor*qty),standardAssembly:this.round(assembly)};
+   return {...row,qty,stockQty,standardFactor:factor,costs,standardTT:this.includesStandardTT(setup)?this.round(Number(setup.fields.tt||0)*Number(setup.fields.ttfx||0)*factor*qty):0,standardAssembly:this.round(assembly)};
   });
   const addActual=(sku,uom,key,name,source,amount,party='')=>{
+   if(this.isCashMargin({key,name}))return;
    const item=rows.find(r=>r.itemCode===sku&&r.uom===uom);if(!item)throw Error('Expense SKU missing in manifest: '+sku);
    let cost=item.costs.find(c=>c.key===key);if(!cost){cost={key,name,source,actual:0,standard:0,partyCode:party};item.costs.push(cost)}
    cost.actual=this.round(cost.actual+amount);cost.source=cost.source==='Standard setup'?source:cost.source.includes(source)?cost.source:cost.source+'; '+source;cost.partyCode=[...new Set([cost.partyCode,party].filter(Boolean))].join(', ');
@@ -72,11 +76,11 @@ const LandedStore={
   const rows=basis.rows.map(item=>{
    const key=item.itemCode+'|'+item.uom,input=extras.find(r=>r.itemCode===item.itemCode&&r.uom===item.uom);if(!input||seen.has(key))throw Error('Invalid additional-cost SKU.');seen.add(key);
    const values={};for(const name of ['tt','assembly']){const value=Number(input[name]);if(input[name]===''||!Number.isFinite(value)||value<0)throw Error('Enter non-negative '+name+' amount for '+item.itemCode);values[name]=value}
-   const costs=[...JSON.parse(JSON.stringify(item.costs)),{key:'extra:tt',name:'TT amount',source:'Landed cost entry',actual:values.tt,standard:item.standardTT,partyCode:String(input.ttParty||'').trim()},{key:'extra:assembly',name:'Assembly cost',source:'Landed cost entry',actual:values.assembly,standard:item.standardAssembly,partyCode:String(input.assemblyParty||'').trim()}].map(c=>({...c,actual:this.round(c.actual),standard:this.round(c.standard),variance:this.round(c.actual-c.standard)}));
+   const costs=[...JSON.parse(JSON.stringify(item.costs.filter(cost=>!this.isCashMargin(cost)))),{key:'extra:tt',name:'TT amount',source:'Landed cost entry',actual:values.tt,standard:this.standardTTAmount(item),partyCode:String(input.ttParty||'').trim()},{key:'extra:assembly',name:'Assembly cost',source:'Landed cost entry',actual:values.assembly,standard:item.standardAssembly,partyCode:String(input.assemblyParty||'').trim()}].map(c=>({...c,actual:this.round(c.actual),standard:this.round(c.standard),variance:this.round(c.actual-c.standard)}));
    const totalActual=this.round(costs.reduce((s,c)=>s+c.actual,0)),totalStandard=this.round(costs.reduce((s,c)=>s+c.standard,0));
-   return {...item,costs,totalActual,totalStandard,variance:this.round(totalActual-totalStandard),actualPerUnit:totalActual/item.qty,standardPerUnit:totalStandard/item.qty,actualPerStockUnit:totalActual/item.stockQty,standardPerStockUnit:totalStandard/item.stockQty};
+   return {...item,standardTT:this.standardTTAmount(item),costs,totalActual,totalStandard,variance:this.round(totalActual-totalStandard),actualPerUnit:totalActual/item.qty,standardPerUnit:totalStandard/item.qty,actualPerStockUnit:totalActual/item.stockQty,standardPerStockUnit:totalStandard/item.stockQty};
   });
-  return {rows,totalActual:this.round(rows.reduce((s,r)=>s+r.totalActual,0)),totalStandard:this.round(rows.reduce((s,r)=>s+r.totalStandard,0)),totalVariance:this.round(rows.reduce((s,r)=>s+r.variance,0))};
+  return {rows,marginIncludedInLandedCost:false,totalActual:this.round(rows.reduce((s,r)=>s+r.totalActual,0)),totalStandard:this.round(rows.reduce((s,r)=>s+r.totalStandard,0)),totalVariance:this.round(rows.reduce((s,r)=>s+r.variance,0))};
  },
  save(input,revision){
   const records=this.read(),index=records.findIndex(r=>r.id===input.id),old=records[index];
