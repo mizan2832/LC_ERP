@@ -26,7 +26,7 @@ const LandedStore={
    add('fob','PI FOB / invoice value','Invoice',Number(row.amountLC),Number(setup.fields.pi)*Number(setup.fields.fx)*factor*qty);
    const dutyRow=duty.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);if(!dutyRow)throw Error('Duty SKU missing: '+row.itemCode);
    if(Number(setup.fields.freight)>0)add('freight','Freight (legacy input)','Duty valuation input',Number(dutyRow.freight)*Number(bank.basis.rate)*qty,Number(setup.fields.freight)*Number(setup.fields.fx)*factor*qty);
-   (setup.costs||[]).filter(c=>c.included&&!/assembl/i.test(c.name)).forEach(cost=>{
+   (setup.costs||[]).filter(c=>c.included&&!/assembl/i.test(c.name)&&!(setup.calculation?.marginIncludedInLandedCost===false&&StandardCostMath.isMargin(c))).forEach(cost=>{
     const amount=Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN));
     if(!Number.isFinite(amount))throw Error(row.itemCode+': calculated standard missing for '+cost.name);
     if(amount>0)add('head:'+ExpenseStore.headKey(cost),cost.name,'Standard setup',0,amount*qty*StandardCostMath.factor(setup,row));
