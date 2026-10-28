@@ -1,4 +1,6 @@
 // Demonstration item master. Confirm classifications against approved item data.
+const RETIRED_GREASE_SKUS=new Set(['GY-GREASE-KG','LUB003','GY-AVALON-3-0P5KGX12']);
+function isRetiredProduct(item){return RETIRED_GREASE_SKUS.has(String(item.sku||item.code||'').trim().toUpperCase())}
 const PRODUCT_DATASET = [
   {category:'Bike',sku:'BIKE-ZS',product:'ZS',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'ZS',grade:'Standard',colour:'STANDARD'},
   {category:'Bike',sku:'BIKE-ES-3',product:'ES-3',hs:'87116000',unit:'PCS',pack:'1',uom:'PCS',model:'ES-3',grade:'Standard',colour:'STANDARD'},
@@ -29,8 +31,8 @@ const LEGACY_PRODUCT_ITEMS=[
 LEGACY_PRODUCT_ITEMS.forEach(item=>{if(!PRODUCT_DATASET.some(p=>p.sku===item.code))PRODUCT_DATASET.push({category:item.productType==='Lubricant'?'Goodyear lubricants':item.productType==='Finished Good'?'Bike':'Spare parts',sku:item.code,product:item.description,hs:item.hs||'',unit:item.convertedUom,pack:String(item.factor),uom:item.uom,grade:item.grade,colour:item.colour,model:item.model,packSize:item.packSize})});
 // Test classifications are provisional; specifications and import condition must be confirmed.
 PRODUCT_DATASET.forEach(item=>item.hsStatus='Provisional — verify before customs use');
-function getProductDataset(){const items=[...PRODUCT_DATASET];const standards=JSON.parse(localStorage.getItem('lc-standards-v1')||'[]');if(Array.isArray(standards))standards.forEach(s=>{if(s.fields?.sku)items.push({...s.fields,category:!s.fields.category||s.fields.category==='Lubricants'?'Goodyear lubricants':s.fields.category})});return items.filter((p,i,a)=>a.findIndex(q=>q.sku===p.sku)===i)}
-function productToRequisition(p){return {code:p.sku,description:p.product,hs:p.hs||'',grade:p.grade||(p.category==='Goodyear lubricants'?'15W-40':'Standard'),packSize:p.packSize||p.pack+' '+p.unit,category:p.category,colour:p.colour||'STANDARD',model:p.model||p.product,productType:p.category==='Goodyear lubricants'?'Lubricant':p.category==='Bike'?'Finished Good':'Spare Parts',uom:p.uom||(p.unit==='Litre'?'PACK':['LTR','KG'].includes(p.unit)?p.unit:'PCS'),convertedUom:p.unit,factor:Number(p.pack),active:true}}
+function getProductDataset(){const items=[...PRODUCT_DATASET];const standards=JSON.parse(localStorage.getItem('lc-standards-v1')||'[]');if(Array.isArray(standards))standards.forEach(s=>{if(s.fields?.sku)items.push({...s.fields,category:!s.fields.category||s.fields.category==='Lubricants'?'Goodyear lubricants':s.fields.category})});return items.filter((p,i,a)=>!isRetiredProduct(p)&&p.active!==false&&a.findIndex(q=>q.sku===p.sku)===i)}
+function productToRequisition(p){return {code:p.sku,description:p.product,hs:p.hs||'',grade:p.grade||(p.category==='Goodyear lubricants'?'15W-40':'Standard'),packSize:p.packSize||p.pack+' '+p.unit,category:p.category,colour:p.colour||'STANDARD',model:p.model||p.product,productType:p.category==='Goodyear lubricants'?'Lubricant':p.category==='Bike'?'Finished Good':'Spare Parts',uom:p.uom||(p.unit==='Litre'?'PACK':['LTR','KG'].includes(p.unit)?p.unit:'PCS'),convertedUom:p.unit,factor:Number(p.pack),active:p.active!==false&&!isRetiredProduct(p)}}
 
 // Sample choices for margin entry; no bank agreement rates are implied.
 const MARGIN_BANK_NAMES=['Sonali Bank','Janata Bank','Agrani Bank','Rupali Bank','BRAC Bank','Eastern Bank','Dutch-Bangla Bank','The City Bank','Prime Bank','Bank Asia'];
@@ -54,9 +56,15 @@ const INVOICE_LUBRICANTS=[
  ['Fuerza 4T','20W50','1L×12',12,1.75,21.00,'SL'],
  ['Shift Premium','80W90','4L×4',16,2.65,42.40,'GL-4'],
  ['Shift Premium','85W140','4L×4',16,2.75,44.00,'GL-4'],
- ['Avalon','3','0.5KG×12',6,6.70,40.20,'',null,'KG']
-].map(([specification,grade,packSize,factor,fobUnit,fobPack,api,existing,unit='LTR'])=>({category:'Goodyear lubricants',sku:existing||('GY-'+specification+'-'+grade+'-'+packSize).toUpperCase().replace(/ /g,'-').replace(/×/g,'X').replace(/\./g,'P'),product:'Goodyear '+specification+'_'+grade+'_'+packSize,specification:'Goodyear '+specification,grade,packSize,unit,pack:String(factor),uom:'PACK',model:'Goodyear '+specification,api,invoiceReference:'2026-09-09',referenceFobUnitUSD:fobUnit,referenceFobPackUSD:fobPack,hs:unit==='KG'?'27101989':'27101931'}));
+ ['Avalon','3','0.5Kg*24',12,3.35,40.20,'MP',null,'KG'],
+ ['Avalon','3','1Kg*12',12,3.30,39.60,'MP',null,'KG'],
+ ['Avalon','3','10Kg*1',10,2.95,29.50,'MP',null,'KG'],
+ ['Avalon','3','15Kg*1',15,2.90,43.50,'MP',null,'KG']
+].map(([specification,grade,packSize,factor,fobUnit,fobPack,api,existing,unit='LTR'])=>({category:'Goodyear lubricants',sku:existing||('GY-'+specification+'-'+grade+'-'+packSize).toUpperCase().replace(/ /g,'-').replace(/\*/g,'X').replace(/×/g,'X').replace(/\./g,'P'),product:'Goodyear '+specification+'_'+grade+'_'+packSize,specification:'Goodyear '+specification,grade,packSize,unit,pack:String(factor),uom:'PACK',model:'Goodyear '+specification,api,invoiceReference:'2026-09-09',referenceFobUnitUSD:fobUnit,referenceFobPackUSD:fobPack,hs:unit==='KG'?'27101998':'27101931'}));
 INVOICE_LUBRICANTS.forEach(item=>{const prior=PRODUCT_DATASET.find(p=>p.sku===item.sku);if(prior){prior.product=item.product;prior.grade=item.grade;prior.packSize=item.packSize;prior.specification=item.specification;prior.api=item.api;prior.referenceFobUnitUSD=item.referenceFobUnitUSD;prior.referenceFobPackUSD=item.referenceFobPackUSD;prior.invoiceReference=item.invoiceReference}else PRODUCT_DATASET.push({...item,invoiceAddition:true,hsStatus:'Provisional — verify before customs use'})});
 
 // User-selected shared SAMPLE code for the Bike category; not a customs classification.
 PRODUCT_DATASET.filter(item=>item.category==='Bike').forEach(item=>item.hs='87116000');
+
+// Retain retired definitions for historical document lookups, but exclude new selection.
+PRODUCT_DATASET.filter(isRetiredProduct).forEach(item=>item.active=false);

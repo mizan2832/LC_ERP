@@ -1,5 +1,5 @@
 function normalizeCategory(value){return !value||value==='Lubricants'?'Goodyear lubricants':value}
-function catalog(){const products=[...getProductDataset()];readStorage().forEach(x=>products.push({...x.fields,category:normalizeCategory(x.fields.category)}));return products.filter((p,i,a)=>a.findIndex(q=>q.category===p.category&&q.sku===p.sku)===i)}
+function catalog(){const products=[...getProductDataset()];readStorage().forEach(x=>products.push({...x.fields,category:normalizeCategory(x.fields.category)}));return products.filter((p,i,a)=>!isRetiredProduct(p)&&p.active!==false&&a.findIndex(q=>q.category===p.category&&q.sku===p.sku)===i)}
 function applyProduct(p){['sku','product','hs'].forEach(id=>$(id).value=p?p[id]||'':'');if(p){$('unit').value=p.unit;$('pack').value=p.pack}}
 function syncProducts(){const select=$('productSelect');select.replaceChildren(new Option('Select an item…',''));catalog().filter(p=>p.category===$('category').value).forEach(p=>select.add(new Option(p.product,p.sku)));select.value=$('sku').value;if(select.selectedIndex<0)select.value='';const p=catalog().find(p=>p.category===$('category').value&&p.sku===select.value);applyProduct(p)}
 function amountInsurance(supplier){if(!$('i-insurance-0').checked)return 0;return $('m-insurance-0').value==='fixed'?n('v-insurance-0'):supplier*n('v-insurance-0')/100}

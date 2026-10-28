@@ -1,7 +1,6 @@
 // Demonstration items for manual entry and Excel import tests.
 const PR_TEST_ITEMS=[
  {code:'GY-ENGINE-LTR',description:'Goodyear engine oil — sample litre item',grade:'15W-40',packSize:'1 LTR',category:'Goodyear lubricants',colour:'GOLD',model:'Demo engine oil',productType:'Lubricant',uom:'LTR',convertedUom:'LTR',factor:1,active:true},
- {code:'GY-GREASE-KG',description:'Goodyear grease — sample kilogram item',grade:'NLGI-2',packSize:'1 KG',category:'Goodyear lubricants',colour:'AMBER',model:'Demo grease',productType:'Lubricant',uom:'KG',convertedUom:'KG',factor:1,active:true}
 ];
 PR_TEST_ITEMS.forEach(item=>{if(!catalog.some(p=>p.code===item.code))catalog.push(item)});
 $('excelFormatBtn').onclick=()=>{downloadPrWorkbook([],'Purchase_Requisition_Format.xlsx');notify('Excel format downloaded. Enter Item Code, Required Qty, Unit Price and Colour. Duplicate items cannot be saved.')};
