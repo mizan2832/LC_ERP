@@ -55,9 +55,9 @@ const LandedStore={
     });
    });
   });
-  duty.rows.forEach(line=>DUTY_HEADS.forEach(head=>{
-   const item=rows.find(r=>r.itemCode===line.itemCode&&r.uom===line.uom),cost=item?.standardSnapshot.costs.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);
-   const amount=line.heads[head.id]?.actual;if(amount===null||amount===undefined)throw Error('Actual duty missing for '+line.itemCode+' '+head.name);
+  duty.rows.forEach(line=>DutyStore.heads(duty.basis).forEach(head=>{
+   const item=rows.find(r=>r.itemCode===line.itemCode&&r.uom===line.uom),cost=DutyStore.costForHead(item?.standardSnapshot,head);
+   const amount=line.heads[head.id]?.actual??(head.processing?0:null);if(amount===null||amount===undefined)throw Error('Actual duty missing for '+line.itemCode+' '+head.name);
    addActual(line.itemCode,line.uom,cost?'head:'+ExpenseStore.headKey(cost):'duty:'+head.id,head.name,duty.number,Number(amount),duty.header.dutyParty||'');
   }));
   bank.allocation.lines.forEach(line=>line.allocations.forEach(head=>{const source=bank.rows.find(r=>r.headKey===head.headKey);addActual(line.itemCode,line.uom,'head:'+head.headKey,head.headName,bank.number,Number(head.amount),source?.partyCode||'')}));

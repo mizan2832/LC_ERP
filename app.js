@@ -5,7 +5,7 @@ const groups=[
 ['bank','LC opening expenses',['Commission','SWIFT charge','Stamp charge','Other bank charges','Bank tax','Bank VAT','Stationery bill','Additional charges','Amendment cost','LC Margin']],
 ['insurance','Insurance expenses',['Insurance premium cost']],
 ['duty','Government duties & taxes',['Customs Duty — CD','Regulatory Duty — RD','Supplementary Duty — SD','Value Added Tax — VAT','Advance Income Tax — AIT','Advance Tax — AT','Fine / penalty']],
-['global','Customs processing expenses',['Document processing fee','VAT on C&F commission','Income tax on C&F commission','Container scanning fee']],
+['global','Customs processing expenses',['Document processing fee','VAT on C&F commission','Income tax on C&F commission','Container scanning fee','Penalty fee']],
 ['port','Port, C & F Expenses',['Port charge and survey bill','Terminal handling charge','Scanning charge','Container handling charge','Lift on / lift off','Storage charge','Shipping line charge','Delivery order charge','Documentation charge','Container deposit (refundable)','Container detention','Survey charge','Lab / testing charge','NOC / permit charge','Other clearance cost']],
 ['cf','C&F expenses',['Customs handling cost','Port charge','C&F commission','Port handling cost','On-chassis permission cost','Unstuffing charges','Special delivery permission','Delivery labour bill','Documents correction bill','Auction lock removal cost','Red cancellation','BL verification','Examination / IRM charge','Association fee','Delay receipt interest fee','Others','Freight cost']],
 ['local','Transport, testing & retirement',['Carrying charges','Additional freight (BDT)','BSTI testing fee','BSTI sticker','Other charges','LC retirement / interest','Other retirement cost']]
