@@ -25,10 +25,10 @@ const BankCustomsStore={
   return basis.rows.map(row=>{
    const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>BANK_CUSTOMS_GROUPS[c.key]&&c.included&&ExpenseStore.headKey(c)===headKey);
    const amount=cost?Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN)):0;
-   // BDT expense standards are per order unit; only FOB pricing converts LTR/KG.
-   const factor=1;
+   // New KG/LTR standards convert by manifest stock quantity; legacy frozen pack standards retain factor 1.
+   const factor=StandardCostMath.factor(setup,row);
    const valid=Number.isFinite(amount)&&amount>=0&&Number.isFinite(factor)&&factor>0&&Number.isFinite(Number(row.qty))&&Number(row.qty)>0;
-   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,missingStandard:!cost,valid,unitStandard:valid?amount:null,standardQty:valid?Number(row.qty)*factor:null,standardUom:normalize(row.uom),standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:!cost?row.itemCode+': no captured standard for this head; standard is 0 BDT.':valid?'':row.itemCode+': invalid saved standard amount or manifest quantity.'};
+   return {sku:row.itemCode,qty:row.qty,uom:row.uom,setupNumber:setup?.setupNumber,missingStandard:!cost,valid,unitStandard:valid?amount:null,standardQty:valid?Number(row.qty)*factor:null,standardUom:normalize(setup?.calculation?.expenseUnitBasis==='stock'?setup.fields.unit:row.uom),standard:valid?amount*factor:null,total:valid?this.round(amount*factor*row.qty):null,message:!cost?row.itemCode+': no captured standard for this head; standard is 0 BDT.':valid?'':row.itemCode+': invalid saved standard amount or manifest quantity.'};
   });
  },
  standardTotal(basis,headKey){const checks=this.checks(basis,headKey);if(checks.some(c=>!c.valid))throw Error(checks.filter(c=>!c.valid).map(c=>c.message).join(' '));return this.round(checks.reduce((sum,c)=>sum+c.total,0))},

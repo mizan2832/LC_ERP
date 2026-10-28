@@ -29,7 +29,7 @@ const LandedStore={
    (setup.costs||[]).filter(c=>c.included&&!/assembl/i.test(c.name)).forEach(cost=>{
     const amount=Number(setup.calculation?.amounts?.[cost.id]??(cost.method==='fixed'?cost.value:NaN));
     if(!Number.isFinite(amount))throw Error(row.itemCode+': calculated standard missing for '+cost.name);
-    if(amount>0)add('head:'+ExpenseStore.headKey(cost),cost.name,'Standard setup',0,amount*qty);
+    if(amount>0)add('head:'+ExpenseStore.headKey(cost),cost.name,'Standard setup',0,amount*qty*StandardCostMath.factor(setup,row));
    });
    const assembly=0;
    return {...row,qty,stockQty,standardFactor:factor,costs,standardTT:this.round(Number(setup.fields.tt||0)*Number(setup.fields.ttfx||0)*factor*qty),standardAssembly:this.round(assembly)};

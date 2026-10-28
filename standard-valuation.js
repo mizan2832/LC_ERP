@@ -5,12 +5,11 @@ function normalizeStandardValuation(data){
   const saved=c.customsAssessableValue;
   f.totalAssessableBDT=saved!==undefined&&saved!==null?saved:f.assUsd!==undefined&&f.assUsd!==''?Number(f.assUsd)*Number(f.cfx??f.fx??0)+Number(f.landingBDT??c.landingCharge??0)+Number(f.psiBDT??c.psiAssessableValue??0):'';
  }
- // Convert an old foreign-currency freight input to a BDT order-unit head in memory.
- const freight=Number(f.freight||0),fx=Number(f.fx||0),unit=String(f.unit||'').toUpperCase();
- const factor=/LTR|LITRE|LITER|KG|KILOGRAM/.test(unit)?Number(f.pack||1):1;
+ // Convert an old foreign-currency freight input to a BDT stock-unit head in memory.
+ const freight=Number(f.freight||0),fx=Number(f.fx||0);
  if(freight>0&&fx>0){
   const existing=copy.costs.find(cost=>cost.key==='cf'&&String(cost.name||'').trim().toLowerCase()==='freight cost');
-  const converted=Math.round(freight*fx*factor*100)/100;
+  const converted=Math.round(freight*fx*100)/100;
   if(!existing)copy.costs.push({id:'cf-freight',key:'cf',name:'Freight cost',method:'fixed',value:converted,included:true});
   else if(existing.method==='fixed'){existing.value=converted+(existing.included?Number(existing.value||0):0);existing.included=true}
   else copy.costs.push({id:'cf-legacy-freight',key:'cf',name:'Legacy freight cost',custom:true,method:'fixed',value:converted,included:true});

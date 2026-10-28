@@ -15,17 +15,17 @@ const CNF_PARTIES=[{id:'CNF-001',name:'Sample C&F Agent — Chattogram'},{id:'CN
 const DutyStore={
  key:'lc-duty-calculations-v1',
  headConfigured(row,head){const setup=row.standardSnapshot,cost=setup?.costs?.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);return Boolean(cost?.included)&&cost.value!==''&&cost.value!==null&&Number.isFinite(Number(cost.value))&&Number.isFinite(Number(setup.calculation?.amounts?.[cost.id]??cost.value))},
- // Saved BDT standards are per order unit, independent of FOB LTR/KG pricing.
+ // Normalize either stock-unit or legacy pack-unit snapshots to one order unit.
  orderStandards(basis){
   return {...basis,standardUnitBasis:'order',rows:basis.rows.map(row=>{
-   const setup=row.standardSnapshot;if(!setup)return {...row};
+   const setup=row.standardSnapshot;if(!setup)return {...row};const unitFactor=StandardCostMath.factor(setup,row);
    const amounts=setup.calculation?.amounts||{},costValue=cost=>cost?.included?Number(amounts[cost.id]??(cost.method==='fixed'?cost.value:NaN)):0;
    const heads=Object.fromEntries(DUTY_HEADS.map(head=>{
     const cost=setup.costs?.find(c=>head.match?head.match.test(c.name||''):c.id===head.standard);
-    return [head.id,{...row.heads[head.id],method:cost?.included?cost.method:'fixed',value:cost?.included?Number(cost.value):0,standard:costValue(cost)}];
+    return [head.id,{...row.heads[head.id],method:cost?.included?cost.method:'fixed',value:cost?.included?Number(cost.value):0,standard:costValue(cost)*unitFactor}];
    }));
    const cf=setup.costs?.find(cost=>cost.id==='cf-2');
-   return {...row,heads,cf:costValue(cf),standardAV:Number(setup.calculation?.customsAssessableValue),standardPSI:Number(setup.calculation?.psiAssessableValue??setup.fields?.psiAV??0)};
+   return {...row,heads,cf:costValue(cf)*unitFactor,standardAV:Number(setup.calculation?.customsAssessableValue)*unitFactor,standardPSI:Number(setup.calculation?.psiAssessableValue??setup.fields?.psiAV??0)*unitFactor};
   })};
  },
  validateConfiguredHeads(basis,result,old){for(const row of result.rows){const source=basis.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom);for(const head of DUTY_HEADS){if(this.headConfigured(source,head))continue;const actual=row.heads[head.id].actual,previous=old?.rows.find(r=>r.itemCode===row.itemCode&&r.uom===row.uom)?.heads?.[head.id]?.actual;if(Number(actual)>0&&(!old||Number(previous)!==Number(actual)))throw Error(row.itemCode+': '+head.name+' is not configured in the saved LC standard. Cancel downstream entries in reverse order and cancel/recreate the LC opening to use a new standard.')}}},

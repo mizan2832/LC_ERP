@@ -17,16 +17,25 @@ function syncMarginControls(){const percent=$('marginMode').value==='percent';$(
 
 const fields=['marginBank','marginMode','marginPercent','category','currency','sku','product','hs','unit','pack','date','version','lcType','totalAssessableBDT','pi','tt','ttParty','fx','ttfx'];
 const n=id=>Number($(id).value)||0;const fmt=v=>v.toLocaleString('en-BD',{minimumFractionDigits:2,maximumFractionDigits:2});let amounts={},totals={};
-function calc(){syncStandardTTParty();syncMarginControls();updateStandardCurrency();const lcType=$('lcType').value||'LC',ttIncluded=lcType!=='TT',ttAmountBDT=ttIncluded?n('tt')*n('ttfx'):0;const supplier=n('pi')*n('fx')+ttAmountBDT;$('lcTypeHint').textContent=ttIncluded?'PI FOB and TT amounts are included once in standard landed cost.':'LC type TT: TT rate amount is excluded from standard landed cost; PI FOB remains included; freight can be added under C&F expenses.';$('supplier').parentElement.firstChild.textContent=ttIncluded?'Combined PI + TT (BDT)':'PI FOB - TT excluded (BDT)';const av=n('totalAssessableBDT');amounts={};totals={};const amount=(id,base)=>!$('i-'+id).checked?0:id==='bank-9'&&$('marginPercent').value!==''?n('pi')*n('fx')*n('marginPercent')/100:$('m-'+id).value==='fixed'?n('v-'+id):base*n('v-'+id)/100;
-// Evaluate the six duty heads in dependency order, independent of table row order.
-const dutyBases={};
-['duty-0','duty-1','duty-2','duty-3','duty-4','duty-5'].forEach(id=>{
- const base=id==='duty-2'?av+amounts['duty-0']+amounts['duty-1']:
-  id==='duty-3'||id==='duty-5'?av+amounts['duty-0']+amounts['duty-1']+amounts['duty-2']:av;
- dutyBases[id]=base;amounts[id]=amount(id,base);
-});
-// C&F commission is evaluated before dependent commission taxes.
-const cf=amount('cf-2',supplier);rows.forEach(({id,key})=>{let base=supplier;if(key==='duty'){base=av;if(id==='duty-2')base+=amounts['duty-0']+amounts['duty-1'];if(id==='duty-3'||id==='duty-5')base+=amounts['duty-0']+amounts['duty-1']+amounts['duty-2']}if(key==='global'&&(id==='global-1'||id==='global-2'))base=cf;const a=Object.prototype.hasOwnProperty.call(dutyBases,id)?amounts[id]:amount(id,base);amounts[id]=a;totals[key]=(totals[key]||0)+($('i-'+id).checked?a:0);$('a-'+id).textContent=fmt(a);if(Object.prototype.hasOwnProperty.call(dutyBases,id))$('a-'+id).title='Calculation base: BDT '+fmt(dutyBases[id])+' per stock unit; '+($('m-'+id).value==='percent'?n('v-'+id)+'%':'fixed BDT amount')});const purchase=supplier;const stockFactor=['LTR','KG'].includes(String($('unit').value||'').trim().toUpperCase().replace(/LITRES?|LITERS?/,'LTR'))?Math.max(1,n('pack')):1;const orderPurchase=purchase*stockFactor;const orderTotal=orderPurchase+Object.values(totals).reduce((a,b)=>a+b,0);const total=orderTotal/stockFactor;const previewUnit=String($('unit').value||'unit').trim().toUpperCase().replace(/LITRES?|LITERS?/,'LTR');$('total').textContent=fmt(orderTotal);$('unitlabel').textContent=['LTR','KG'].includes(previewUnit)?'pack ('+fmt(stockFactor)+' '+previewUnit+')':($('unit').value||'unit');$('unitcostlabel').textContent='Landed cost / '+previewUnit;$('unitcost').textContent='৳ '+fmt(total);$('cfr').textContent='BDT '+fmt(n('pi')*n('fx'));$('supplier').textContent='৳ '+fmt(supplier);$('breakdown').innerHTML=`<div class="sumrow"><span>${ttIncluded?'PI + TT purchase value':'PI purchase value (TT excluded)'}</span><b>৳ ${fmt(orderPurchase)}</b></div>`+groups.filter(([k])=>k!=='insurance'&&k!=='cf').map(([k,t])=>{const subtotal=(totals[k]||0)+(k==='bank'?(totals.insurance||0):k==='port'?(totals.cf||0):0);$('sub-'+k).textContent='Included subtotal: ৳ '+fmt(subtotal);return `<div class="sumrow"><span>${t}</span><b>৳ ${fmt(subtotal)}</b></div>`}).join('');return {lcType,ttParty:$('ttParty').value,ttIncluded,ttAmountBDT,total,amounts:{...amounts},totals:{...totals},purchase,orderPurchase,orderTotal,expenseUnitBasis:'order',customsAssessableValue:av,assessableBaseBDT:av,landingCharge:0,psiAssessableValue:0,valuationVersion:8}}
+function calc(){
+ syncStandardTTParty();syncMarginControls();updateStandardCurrency();
+ const data={fields:Object.fromEntries(fields.map(id=>[id,$(id).value])),costs:rows.map(row=>({...row,method:$('m-'+row.id).value,value:$('v-'+row.id).value,included:$('i-'+row.id).checked}))};
+ const result=StandardCostMath.calculate(data);amounts=result.amounts;totals=result.totals;
+ const unit=StandardCostMath.normalize($('unit').value)||'unit',perUnit='BDT / '+unit;
+ $('lcTypeHint').textContent=result.ttIncluded?'PI FOB, TT and all standard costs use one '+unit+'. Pack cost = cost per '+unit+' x pack quantity.':'For LC type TT, TT is excluded. All remaining standard costs use one '+unit+'.';
+ $('supplier').parentElement.firstChild.textContent=(result.ttIncluded?'Combined PI + TT':'PI FOB - TT excluded')+' ('+perUnit+')';
+ $('cfr').textContent='BDT '+fmt(n('pi')*n('fx'));$('supplier').textContent='BDT '+fmt(result.purchase);
+ rows.forEach(row=>{$('a-'+row.id).textContent=fmt(amounts[row.id]||0)});
+ $('total').textContent=fmt(result.orderTotal);$('unitlabel').textContent=['LTR','KG'].includes(unit)?'pack ('+fmt(result.stockFactor)+' '+unit+')':unit;
+ $('unitcostlabel').textContent='Landed cost / '+unit;$('unitcost').textContent='BDT '+fmt(result.total);
+ $('standardBreakdownBasis').textContent='Breakdown: '+perUnit;
+ $('breakdown').innerHTML=`<div class="sumrow"><span>${result.ttIncluded?'PI + TT purchase value':'PI purchase value (TT excluded)'}</span><b>BDT ${fmt(result.purchase)}</b></div>`+groups.filter(([key])=>!['insurance','cf'].includes(key)).map(([key,title])=>{
+  const subtotal=(totals[key]||0)+(key==='bank'?(totals.insurance||0):key==='port'?(totals.cf||0):0);$('sub-'+key).textContent='Included subtotal ('+perUnit+'): '+fmt(subtotal);return `<div class="sumrow"><span>${title}</span><b>BDT ${fmt(subtotal)}</b></div>`;
+ }).join('');
+ document.querySelectorAll('#groups .sectionhead .tag').forEach(tag=>tag.textContent=perUnit);
+ const av=$('totalAssessableBDT');if(av?.closest('label'))av.closest('label').firstChild.textContent='Total assessable value ('+perUnit+')';
+ return result;
+}
 document.addEventListener('input',calc);document.addEventListener('change',calc);
 function readStorage(){try{return JSON.parse(localStorage.getItem('lc-standards-v1')||'[]')}catch{return []}}
 function list(){const sel=$('saved');sel.replaceChildren(new Option('Select a saved standard…',''));readStorage().forEach((x,i)=>{if(!Object.values(x.fields).join(' ').toLowerCase().includes($('search').value.toLowerCase()))return;sel.add(new Option(`${normalizeCategory(x.fields.category)} · ${x.fields.product} · ${x.fields.sku} · ${x.fields.version} · ${x.fields.date}`,String(i)))}); if(sel.options.length===1)sel.options[0].textContent='No matching saved setups';}
