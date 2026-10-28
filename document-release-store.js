@@ -1,6 +1,15 @@
 const ReleaseStore={
  key:'lc-document-releases-v1',
  read(){const records=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(records))throw Error('Invalid document release storage.');return records},
+ validDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value},
+ automaticDate(receipt,header,old){
+  const received=receipt.header.receiptDate;if(!this.validDate(received))throw Error('The goods receipt date is invalid. Correct the receipt date first.');
+  if(header.nocDate&&!this.validDate(header.nocDate))throw Error('Enter a valid Bank NOC date.');
+  const saved=old?.header?.releaseDate,base=this.validDate(saved)?saved:LCDateRules.today();
+  if(!this.validDate(base))throw Error('The automatic system date is invalid.');
+  // Retain valid historical dates; advance only to satisfy the underlying documents.
+  return [base,received,header.nocDate||''].sort().at(-1);
+ },
  blocked(id){return Rollback.active('lc-duty-calculations-v1',r=>r.documentReleaseId===id)?'Duty calculation already exists.':''},
  basis(receiptId){
   const receipts=PortStore.read(),receipt=receipts.find(r=>r.id===receiptId&&r.status==='Received');
@@ -122,7 +131,7 @@ const ReleaseStore={
   if(records.some(r=>r.id!==input.id&&r.portReceiptId===input.portReceiptId&&r.status!=='Cancelled'))throw Error('A document release already exists for this manifest.');
   const receipt=PortStore.read().find(r=>r.id===input.portReceiptId&&r.status==='Received');if(!receipt)throw Error('Select a received manifest.');
   if(!['Draft','Released'].includes(input.status)||!['Original','Copy'].includes(input.header.documentType)||!['LATR','PAD','None'].includes(input.header.loanType)||!['Unposted','Posted'].includes(input.glStatus))throw Error('Select valid document, loan and GL options.');
-  const date=old?.header?.releaseDate||LCDateRules.today();input={...input,header:{...input.header,releaseDate:date}};if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<receipt.header.receiptDate)throw Error('Release date must be valid and on or after receipt date.');
+  const date=this.automaticDate(receipt,input.header,old);input={...input,header:{...input.header,releaseDate:date}};
   if(input.status==='Released'&&!input.header.nocDate)throw Error('Enter Bank NOC date.');
   if(input.header.nocDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(input.header.nocDate)||!Number.isFinite(Date.parse(input.header.nocDate+'T00:00:00Z'))||input.header.nocDate>date))throw Error('Bank NOC date must be valid and no later than release date.');
   const basis=old?.basis||this.basis(input.portReceiptId),calculated=this.calculate(basis,input.header.rate,input.header.loanType,input.id,input.header.loanValue);
