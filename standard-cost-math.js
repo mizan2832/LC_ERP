@@ -13,7 +13,7 @@ const StandardCostMath={
  calculate(data){
   const f=data.fields||{},costs=(data.costs||[]).filter(c=>!/assembl/i.test(c.name||'')),n=value=>Number(value||0);
   const lcType=f.lcType||'LC',ttIncluded=lcType!=='TT',ttAmountBDT=ttIncluded?n(f.tt)*n(f.ttfx):0,purchase=n(f.pi)*n(f.fx)+ttAmountBDT,av=n(f.totalAssessableBDT),amounts={},totals={},dutyBases={};
-  const amount=(cost,base)=>!cost?.included?0:cost.id==='bank-9'&&(f.marginMode==='percent'||(f.marginPercent!==undefined&&f.marginPercent!=='')||(cost.method==='percent'&&f.marginMode!=='fixed'))?n(f.pi)*n(f.fx)*n(f.marginPercent!==undefined&&f.marginPercent!==''?f.marginPercent:cost.value)/100:cost.method==='fixed'?n(cost.value):base*n(cost.value)/100;
+  const amount=(cost,base)=>!cost?.included||lcType==='TT'&&this.isMargin(cost)?0:cost.id==='bank-9'&&(f.marginMode==='percent'||(f.marginPercent!==undefined&&f.marginPercent!=='')||(cost.method==='percent'&&f.marginMode!=='fixed'))?n(f.pi)*n(f.fx)*n(f.marginPercent!==undefined&&f.marginPercent!==''?f.marginPercent:cost.value)/100:cost.method==='fixed'?n(cost.value):base*n(cost.value)/100;
   ['duty-0','duty-1','duty-2','duty-3','duty-4','duty-5'].forEach(id=>{const base=id==='duty-2'?av+amounts['duty-0']+amounts['duty-1']:['duty-3','duty-5'].includes(id)?av+amounts['duty-0']+amounts['duty-1']+amounts['duty-2']:av;dutyBases[id]=base;amounts[id]=amount(costs.find(c=>c.id===id),base)});
   const cf=amount(costs.find(c=>c.id==='cf-2'),purchase);
   costs.forEach(cost=>{const base=cost.key==='duty'?av:cost.key==='global'&&['global-1','global-2'].includes(cost.id)?cf:purchase;const value=Object.hasOwn(dutyBases,cost.id)?amounts[cost.id]:amount(cost,base);amounts[cost.id]=value;totals[cost.key]=(totals[cost.key]||0)+(this.isMargin(cost)?0:value)});
