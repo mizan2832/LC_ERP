@@ -4,11 +4,11 @@ const drFmt=value=>Number(value||0).toLocaleString('en-BD',{minimumFractionDigit
 const drEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function drMessage(text,error=false){dr('message').textContent=text;dr('message').className=error?'error':'success'}
 function releaseLists(){
- const selected=dr('manifest').value,query=dr('manifestSearch').value.toLowerCase(),records=ReleaseStore.read();
+ const selected=dr('manifest').value,records=ReleaseStore.read();
  dr('manifest').replaceChildren(new Option('Select received manifest',''));
  PortStore.read().filter(r=>r.status==='Received'&&(!records.some(d=>d.portReceiptId===r.id&&d.id!==releaseId&&d.status!=='Cancelled'))).forEach(receipt=>{
   const lc=LCStore.read().find(l=>l.id===receipt.lcOpeningId),label=receipt.header.manifest+' · LC '+(lc?.number||'')+' · '+receipt.number;
-  if(label.toLowerCase().includes(query)||receipt.id===selected)dr('manifest').add(new Option(label,receipt.id));
+  dr('manifest').add(new Option(label,receipt.id));
  });dr('manifest').value=selected;
  dr('savedRelease').replaceChildren(new Option('Select saved release',''));records.forEach(r=>dr('savedRelease').add(new Option(r.number+' · '+r.manifestNumber+' · '+r.status+' · '+r.glStatus,r.id)));
 }
@@ -45,10 +45,10 @@ function renderRelease(){
  updateReleaseHistoryButtons();
  dr('modifyRelease').textContent=releaseEditing?'Save Changes':'Modify';dr('cancelRelease').disabled=!old||old.status==='Cancelled'||old.glStatus==='Posted'||Boolean(blocked);
 }
-function loadRelease(record){releaseId=record.id;releaseRevision=record.revision;releaseStatus=record.status;releaseEditing=false;releaseBasis=JSON.parse(JSON.stringify(record.basis));drFields.forEach(id=>dr(id).value=record.header[id]??(id==='loanValue'?record.loanValue??'':''));document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.checked=input.value===record.glStatus);dr('releaseNumber').value=record.number;dr('manifestSearch').value='';releaseLists();dr('manifest').value=record.portReceiptId;renderRelease();drMessage(record.number+' loaded.');resetReleaseHistory();}
+function loadRelease(record){releaseId=record.id;releaseRevision=record.revision;releaseStatus=record.status;releaseEditing=false;releaseBasis=JSON.parse(JSON.stringify(record.basis));drFields.forEach(id=>dr(id).value=record.header[id]??(id==='loanValue'?record.loanValue??'':''));document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.checked=input.value===record.glStatus);dr('releaseNumber').value=record.number;releaseLists();dr('manifest').value=record.portReceiptId;renderRelease();drMessage(record.number+' loaded.');resetReleaseHistory();}
 function saveRelease(status){try{if(!releaseBasis)throw Error('Select a received manifest.');const record=ReleaseStore.save({id:releaseId,status,portReceiptId:releaseBasis.receiptId,header:Object.fromEntries(drFields.map(id=>[id,dr(id).value])),glStatus:document.querySelector('[name="releaseGL"]:checked').value},releaseRevision);loadRelease(record);drMessage(record.number+' saved as '+record.status+'.')}catch(e){drMessage(e.message,true)}}
-function newRelease(){releaseId='';releaseRevision=0;releaseStatus='New';releaseEditing=false;releaseBasis=null;drFields.forEach(id=>dr(id).value='');['releaseNumber','lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin','manifestSearch'].forEach(id=>dr(id).value='');dr('documentType').value='Original';dr('loanType').value='LATR';document.querySelector('[name="releaseGL"][value="Unposted"]').checked=true;releaseLists();dr('manifest').value='';renderRelease();drMessage('');resetReleaseHistory();}
-dr('manifestSearch').oninput=()=>{try{releaseLists()}catch(e){drMessage(e.message,true)}};
+function newRelease(){releaseId='';releaseRevision=0;releaseStatus='New';releaseEditing=false;releaseBasis=null;drFields.forEach(id=>dr(id).value='');['releaseNumber','lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin'].forEach(id=>dr(id).value='');dr('documentType').value='Original';dr('loanType').value='LATR';document.querySelector('[name="releaseGL"][value="Unposted"]').checked=true;releaseLists();dr('manifest').value='';renderRelease();drMessage('');resetReleaseHistory();}
+
 dr('manifest').onchange=()=>{try{releaseBasis=dr('manifest').value?ReleaseStore.basis(dr('manifest').value):null;dr('rate').value=releaseBasis?.rate||'';dr('loanValue').value='';if(!releaseBasis)['lcNumber','customInvoice','party','currency','margin','loanValue','cashMargin','usedMargin','remainingMargin'].forEach(id=>dr(id).value='');renderRelease();drMessage('');resetReleaseHistory()}catch(e){releaseBasis=null;drMessage(e.message,true)}};
 dr('rate').oninput=renderRelease;dr('loanType').onchange=renderRelease;dr('newRelease').onclick=newRelease;dr('draftRelease').onclick=()=>saveRelease('Draft');dr('saveRelease').onclick=()=>saveRelease('Released');
 dr('modifyRelease').onclick=()=>{if(releaseEditing){saveRelease(releaseStatus==='Released'?'Released':'Draft');return}releaseEditing=true;renderRelease();drMessage('Modify mode. Update fields, then click Save Changes.');};
