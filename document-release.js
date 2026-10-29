@@ -27,6 +27,8 @@ function renderManifestDetails(calc){
 function renderRelease(){
  const old=releaseId?ReleaseStore.read().find(r=>r.id===releaseId):null;
  const blocked=old?ReleaseStore.blocked(old.id):'',locked=Boolean(old&&(old.glStatus==='Posted'||old.status==='Cancelled'||blocked||!releaseEditing));
+ const tt=Boolean(releaseBasis&&ReleaseStore.isTT(releaseBasis));
+ if(tt){dr('loanType').value='None';dr('loanNumber').value='';dr('loanValue').value=''}
  dr('releaseStatus').textContent=releaseEditing?'Editing':releaseStatus;
  dr('releaseRows').replaceChildren();dr('releaseTotals').replaceChildren();
  if(releaseBasis){
@@ -39,7 +41,7 @@ function renderRelease(){
   }catch(e){drMessage(e.message,true)}
  }
  dr('loanNote').textContent=dr('loanType').value==='LATR'?'Enter the LATR amount manually in BDT.':'';
- drFields.forEach(id=>dr(id).disabled=locked);document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.disabled=locked);
+ drFields.forEach(id=>dr(id).disabled=locked);dr('loanType').disabled=locked||tt;dr('loanNumber').readOnly=tt;dr('loanValue').readOnly=tt;document.querySelectorAll('[name="releaseGL"]').forEach(input=>input.disabled=locked);
  dr('manifest').disabled=Boolean(releaseId);dr('draftRelease').disabled=locked;dr('saveRelease').disabled=locked;
  dr('modifyRelease').disabled=!old||old.glStatus==='Posted'||old.status==='Cancelled'||Boolean(blocked);
  updateReleaseHistoryButtons();

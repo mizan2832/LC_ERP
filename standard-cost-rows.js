@@ -20,7 +20,7 @@ function standardHeadChoices(key,currentId=''){
  key=standardEditorGroup(key);
  const names=new Set(),choices=[];
  // Prefer the definitions already loaded in this setup when custom IDs differ.
- [...rows,...standardHeadCatalog.values()].filter(row=>standardEditorGroup(row.key)===key&&!/assembl/i.test(row.name)&&!($('lcType').value==='TT'&&StandardCostMath.isMargin(row))).forEach(row=>{
+ [...rows,...standardHeadCatalog.values()].filter(row=>standardEditorGroup(row.key)===key&&!/assembl/i.test(row.name)).forEach(row=>{
   const name=row.name.trim().toLowerCase();if(names.has(name))return;names.add(name);
   const occupied=rows.some(other=>standardEditorGroup(other.key)===key&&other.id!==currentId&&other.name.trim().toLowerCase()===name&&standardRowVisible(other));
   choices.push({...row,disabled:occupied});

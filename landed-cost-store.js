@@ -67,10 +67,13 @@ const LandedStore={
    if(priorAssembly)row.standardAssembly=0;
    row.costs=row.costs.filter(c=>c.actual!==0||c.standard!==0);
   });
-  return {...JSON.parse(JSON.stringify(bank.basis)),paymentMode:LCStore.read().find(r=>r.id===bank.lcOpeningId)?.header.pay||'',bankCustomsExpenseId:bank.id,bankNumber:bank.number,dutyCalculationId:duty.id,dutyNumber:duty.number,sourceDate:bank.header.costDate,rows,sourceVersions:{bank:bank.revision,duty:duty.revision,openingExpenses:expenses.map(e=>({id:e.id,revision:e.revision}))}};
+  const sourceLC=LCStore.read().find(r=>r.id===bank.lcOpeningId),linkedTT=sourceLC?.ttSnapshot?LCTTCosting.manifest(sourceLC,receipt,PortStore.read()):null;
+  if(linkedTT)rows.forEach(row=>{const allocation=linkedTT.rows.find(r=>r.key===row.itemCode+'|'+row.uom);(allocation?.parties||[]).forEach(p=>row.costs.push({key:'linked-tt:'+p.partyCode,name:'TT amount - '+p.partyName,source:linkedTT.reference,actual:p.amountBDT,standard:p.amountBDT,partyCode:p.partyCode}));row.standardTT=0});
+  return {...JSON.parse(JSON.stringify(bank.basis)),linkedTT,paymentMode:LCStore.read().find(r=>r.id===bank.lcOpeningId)?.header.pay||'',bankCustomsExpenseId:bank.id,bankNumber:bank.number,dutyCalculationId:duty.id,dutyNumber:duty.number,sourceDate:bank.header.costDate,rows,sourceVersions:{bank:bank.revision,duty:duty.revision,openingExpenses:expenses.map(e=>({id:e.id,revision:e.revision}))}};
  },
  allocateTT(basis,extras,ttInput){if(ttInput.total===''||ttInput.total===null||!Number.isFinite(Number(ttInput.total))||Number(ttInput.total)<0)throw Error('Enter a non-negative total TT amount.');const allocation=CostAllocation.calculate(basis.rows,[{headKey:'extra:tt',headName:'TT amount',amount:Number(ttInput.total)}]);return extras.map(extra=>{const line=allocation.lines.find(r=>r.itemCode===extra.itemCode&&r.uom===extra.uom);if(!line)throw Error('TT allocation item missing.');return {...extra,tt:line.allocatedExpense,ttParty:String(ttInput.party||'').trim()}})},
  calculate(basis,extras,ttInput=null){
+  if(basis.linkedTT){extras=extras.map(r=>({...r,tt:0,ttParty:''}));ttInput=null}
   if(ttInput)extras=this.allocateTT(basis,extras,ttInput);
   if(extras.length!==basis.rows.length)throw Error('Enter TT and assembly values for each manifest SKU.');const seen=new Set();
   const rows=basis.rows.map(item=>{
@@ -91,8 +94,9 @@ const LandedStore={
   if(records.some(r=>r.id!==input.id&&r.portReceiptId===bank.portReceiptId&&r.status!=='Cancelled'))throw Error('Landed cost already exists for this manifest.');
   const basis=old?.basis||this.basis(bank.id),date=input.header.costDate;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<basis.sourceDate)throw Error('Enter a valid cost date on or after Bank & Customs expense date.');
+  if(basis.linkedTT)input={...input,ttInput:null,extras:input.extras.map(r=>({...r,tt:0,ttParty:''}))};
   if(input.ttInput){input={...input,extras:this.allocateTT(basis,input.extras,input.ttInput),ttInput:{total:this.round(Number(input.ttInput.total)),party:String(input.ttInput.party||'').trim(),method:'Invoice value weighted'}}}
-  if(input.status==='Saved'&&this.paymentMode(basis)==='L/C + TT'&&!input.extras.some(row=>Number(row.tt)>0))throw Error('LC payment mode is L/C + TT. Enter a positive TT amount before saving landed cost.');
+  if(input.status==='Saved'&&!basis.linkedTT&&this.paymentMode(basis)==='L/C + TT'&&!input.extras.some(row=>Number(row.tt)>0))throw Error('LC payment mode is L/C + TT. Enter a positive TT amount before saving landed cost.');
   input.extras.forEach(row=>{if(Number(row.tt)>0&&!String(row.ttParty||'').trim())throw Error('Select a TT party for '+row.itemCode+'.')});
   if(input.status==='Saved')input.extras.forEach(row=>{if(Number(row.tt)>0&&!String(row.ttParty||'').trim())throw Error('TT party code is required for '+row.itemCode);if(Number(row.assembly)>0&&!String(row.assemblyParty||'').trim())throw Error('Assembly party code is required for '+row.itemCode)});
   if(!old){const fresh=this.basis(bank.id);if(JSON.stringify(fresh.sourceVersions)!==JSON.stringify(input.sourceVersions))throw Error('Source costs changed. Reselect the manifest before saving.')}

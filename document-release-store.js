@@ -1,5 +1,6 @@
 const ReleaseStore={
  key:'lc-document-releases-v1',
+ isTT(basis){return String(basis?.paymentMode??LCStore.read().find(lc=>lc.id===basis?.lcOpeningId)?.header?.pay??'').trim().toUpperCase()==='TT'},
  read(){const records=JSON.parse(localStorage.getItem(this.key)||'[]');if(!Array.isArray(records))throw Error('Invalid document release storage.');return records},
  validDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value},
  automaticDate(receipt,header,old){
@@ -74,7 +75,7 @@ const ReleaseStore={
    const openingCents=Math.round(Number(line.amountLC)*100);group.manifestOpeningLC+=(Math.round(openingCents*Math.min(ordered,before+qty)/ordered)-Math.round(openingCents*Math.min(ordered,before)/ordered))/100;
    group.margin+=(Math.round(cents*Math.min(ordered,before+qty)/ordered)-Math.round(cents*Math.min(ordered,before)/ordered))/100;
   });
-  return {receiptId:receipt.id,manifest:receipt.header.manifest,customInvoice:receipt.header.customInvoice||'',lcOpeningId:lc.id,lcNumber:lc.number,currency:receipt.currency||lc.header.currency,openingRate:Number(lc.header.rate),rate:Number(receipt.exchangeRate||lc.header.rate),party:lc.header.party,receiptDate:receipt.header.receiptDate,rows:[...groups.values()],totalCashMargin,marginMissing:[...new Set(marginMissing)],marginMethod:'Actual LC cash margin allocated by item value and manifest quantity',marginAvailable:expenses.some(e=>e.rows.some(r=>/\bmargin\b/i.test(r.headName||r.headKey)))};
+  return {paymentMode:lc.header.pay,receiptId:receipt.id,manifest:receipt.header.manifest,customInvoice:receipt.header.customInvoice||'',lcOpeningId:lc.id,lcNumber:lc.number,currency:receipt.currency||lc.header.currency,openingRate:Number(lc.header.rate),rate:Number(receipt.exchangeRate||lc.header.rate),party:lc.header.party,receiptDate:receipt.header.receiptDate,rows:[...groups.values()],totalCashMargin,marginMissing:[...new Set(marginMissing)],marginMethod:'Actual LC cash margin allocated by item value and manifest quantity',marginAvailable:expenses.some(e=>e.rows.some(r=>/\bmargin\b/i.test(r.headName||r.headKey)))};
  },
  savedItemMarginTotals(basis){
   const totals=new Map();
@@ -134,7 +135,9 @@ const ReleaseStore={
   const date=this.automaticDate(receipt,input.header,old);input={...input,header:{...input.header,releaseDate:date}};
   if(input.status==='Released'&&!input.header.nocDate)throw Error('Enter Bank NOC date.');
   if(input.header.nocDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(input.header.nocDate)||!Number.isFinite(Date.parse(input.header.nocDate+'T00:00:00Z'))||input.header.nocDate>date))throw Error('Bank NOC date must be valid and no later than release date.');
-  const basis=old?.basis||this.basis(input.portReceiptId),calculated=this.calculate(basis,input.header.rate,input.header.loanType,input.id,input.header.loanValue);
+  const basis=old?.basis||this.basis(input.portReceiptId);
+  if(this.isTT(basis))input={...input,header:{...input.header,loanType:'None',loanNumber:'',loanValue:''}};
+  const calculated=this.calculate(basis,input.header.rate,input.header.loanType,input.id,input.header.loanValue);
   if(input.header.loanType==='LATR'){
    const value=input.header.loanValue;
    if(input.status==='Released'&&(value===undefined||value===null||value===''))throw Error('Enter the LATR amount manually.');
