@@ -12,7 +12,7 @@ const DUTY_HEADS=[
  {id:'scan',name:'Container scanning fee',standard:'global-3',base:'av',processing:true},
  {id:'penalty',name:'Penalty fee',standard:'global-4',base:'av',processing:true}
 ];
-const DUTY_PARTIES=[{id:'DUTY-CTG',name:'Chattogram Customs House'},{id:'DUTY-MGL',name:'Mongla Customs House'},{id:'DUTY-BNP',name:'Benapole Customs House'},{id:'DUTY-ICD',name:'Dhaka ICD Customs House'}];
+const DUTY_PARTIES=[{id:'DUTY-001',name:'Government Duty'}];
 const CNF_PARTIES=[{id:'CNF-001',name:'Sample C&F Agent — Chattogram'},{id:'CNF-002',name:'Sample C&F Agent — Mongla'},{id:'CNF-003',name:'Sample C&F Agent — Benapole'}];
 const DutyStore={
  key:'lc-duty-calculations-v1',
@@ -128,7 +128,6 @@ const DutyStore={
   if(this.boeExists(boeNumber,input.id))throw Error('This Bill of Entry number already exists. Enter a unique BOE number.');
   if(!input.header.boeDate)throw Error('Enter the Bill of Entry date.');
   if(!DUTY_PARTIES.some(p=>p.id===input.header.dutyParty))throw Error('Select the Duty party.');
-  if(!CNF_PARTIES.some(p=>p.id===input.header.cnfParty))throw Error('Select the C&F party.');
   if(input.status==='Saved'){
    if(!basis.rows.every(r=>r.standardSnapshot))throw Error('Saved standard cost snapshot is missing for one or more manifest items.');
   }
