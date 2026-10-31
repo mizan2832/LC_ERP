@@ -65,15 +65,10 @@ const BankCustomsStore={
   if(old?.rows.some(row=>row.glStatus==='Posted'&&!rows.some(r=>r.id===row.id)))throw Error('Posted rows cannot be removed.');
   const result=this.calculate(basis,rows),now=new Date().toISOString();
   const record={...input,...result,basis,portReceiptId:basis.portReceiptId,documentReleaseId:basis.documentReleaseId,lcOpeningId:basis.lcOpeningId,manifestNumber:basis.manifestNumber,currency:'BDT',number:old?.number||'BCE-'+String(records.reduce((max,r)=>Math.max(max,Number(String(r.number).replace('BCE-',''))||0),0)+1).padStart(6,'0'),id:input.id||crypto.randomUUID(),revision:(revision||0)+1,updatedAt:now,history:old?[...(old.history||[]),{action:'Modified',at:now,before:{header:old.header,rows:old.rows},after:{header:input.header,rows:result.rows}}]:[]};
+  GLPayables.sync(record,this.key,old);
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  },
- post(id,rowId,revision){
-  const records=this.read(),index=records.findIndex(r=>r.id===id),record=records[index];
-  if(!record||record.revision!==revision||record.status!=='Saved'||this.blocked(id))throw Error('Save and reload an unlocked expense entry before posting.');
-  const row=record.rows.find(r=>r.id===rowId);if(!row||row.glStatus==='Posted')throw Error('This row is missing or already posted.');
-  if(!String(row.partyCode||'').trim()||!(Number(row.amount)>0))throw Error('Party code and positive amount are required before posting.');
-  const now=new Date().toISOString();row.glStatus='Posted';row.postedAt=now;row.postedBy='DEMO-001 · Rahim Ahmed';record.revision++;record.updatedAt=now;record.history=[...(record.history||[]),{action:'GL row posted',at:now,rowId,headKey:row.headKey,amount:row.amount,partyCode:row.partyCode,user:row.postedBy}];
-  localStorage.setItem(this.key,JSON.stringify(records));return record;
- },
+ post(id,rowId,revision){return GLPayables.setGL(this,id,revision,'Posted',rowId)},
+ unpost(id,rowId,revision){return GLPayables.setGL(this,id,revision,'Unposted',rowId)},
  cancelBlock(id){const record=this.read().find(r=>r.id===id);return record?.rows.some(r=>r.glStatus==='Posted')?'Posted costing rows exist.':this.blocked(id)}
 };

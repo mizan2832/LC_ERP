@@ -25,8 +25,8 @@ function syncPIHeaderValidation(){
  const number=el('piNumber').value.trim();
  const duplicate=number&&PIStore.read().some(pi=>pi.id!==invoiceId&&String(pi.number||'').trim().toUpperCase()===number.toUpperCase());
  el('piNumber').setCustomValidity(duplicate?'This PI number already exists.':'');
- el('piDate').min=el('reqDate').value||'';
- el('piDate').setCustomValidity(el('piDate').value&&el('piDate').min&&el('piDate').value<el('piDate').min?'PI date cannot precede the purchase requisition date.':'');
+ el('piDate').removeAttribute('min');el('piDate').removeAttribute('max');
+ el('piDate').setCustomValidity('');
 }
 function setPILoading(value){
  el('loading').value=String(value||'');

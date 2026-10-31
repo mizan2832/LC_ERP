@@ -11,7 +11,7 @@ const LandedStore={
   const parties=[...new Set(relevant.map(row=>String(row.standardSnapshot.fields.ttParty).trim()))];return parties.length===1?parties[0]:'';
  },
  paymentMode(basis){return basis.paymentMode||LCStore.read().find(r=>r.id===basis.lcOpeningId)?.header.pay||''},
- blocked(id){return Rollback.active('lc-finished-goods-receipts-v1',r=>r.landedCostId===id)?'Finished goods receive entry exists.':''},
+ blocked(id){const record=this.read().find(r=>r.id===id),accounts=record?DutyBookings.cancelReason(this.key,record):'';if(accounts)return accounts;return Rollback.active('lc-finished-goods-receipts-v1',r=>r.landedCostId===id)?'Finished goods receive entry exists.':''},
  basis(bankId){
   const bank=BankCustomsStore.read().find(r=>r.id===bankId&&r.status==='Saved');if(!bank)throw Error('Select a manifest with saved Bank & Customs expenses.');
   const duty=DutyStore.read().find(r=>r.id===bank.dutyCalculationId&&r.status==='Saved');if(!duty)throw Error('Saved duty calculation not found.');

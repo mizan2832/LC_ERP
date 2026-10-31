@@ -145,6 +145,7 @@ const ReleaseStore={
   }
   if(calculated.remainingCashMargin<0)throw Error('Manifest margin exceeds the remaining actual cash margin. Check existing releases and the actual LC cash margin.');
   const record={...input,basis,...calculated,manifestNumber:basis.manifest,lcOpeningId:basis.lcOpeningId,id:input.id||crypto.randomUUID(),number:old?.number||'DR-'+String(records.length+1).padStart(6,'0'),revision:(revision||0)+1,updatedAt:new Date().toISOString(),history:old?[...(old.history||[]),{action:'Modified',at:new Date().toISOString(),before:{header:old.header,rows:old.rows}}]:[]};
+  GLPayables.sync(record,this.key,old);
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  }
 };

@@ -58,7 +58,7 @@ const DutyStore={
  boeExists(number,excludingId=''){const normalized=String(number||'').trim().toUpperCase();return Boolean(normalized)&&this.read().some(record=>record.id!==excludingId&&String(record.header?.boeNumber||'').trim().toUpperCase()===normalized)},
  orderValue(row){return this.round(this.number(row.qty,'manifest quantity')*this.number(row.rate,'PI item rate per order unit'))},
  number(value,label){const n=Number(value);if(value===''||value===null||value===undefined||!Number.isFinite(n)||n<0)throw Error('Enter a non-negative '+label+'.');return n},
- blocked(id){return Rollback.active('lc-bank-customs-expenses-v1',r=>r.dutyCalculationId===id)?'Bank & customs expense entry exists.':''},
+ blocked(id){const accounts=DutyBookings.block(this.read().find(r=>r.id===id));if(accounts)return accounts;return Rollback.active('lc-bank-customs-expenses-v1',r=>r.dutyCalculationId===id)?'Bank & customs expense entry exists.':''},
  basis(releaseId){
   const release=ReleaseStore.read().find(r=>r.id===releaseId&&r.status==='Released');if(!release)throw Error('Select a manifest with a saved document release.');
   const receipt=PortStore.read().find(r=>r.id===release.portReceiptId&&r.status==='Received');if(!receipt)throw Error('Received manifest not found.');
@@ -117,6 +117,7 @@ const DutyStore={
  save(input,revision){
   const records=this.read(),index=records.findIndex(r=>r.id===input.id),old=records[index];
   if(old&&(old.revision!==revision||old.status==='Cancelled'||this.blocked(old.id)))throw Error('Duty entry changed or is locked. Reload it.');
+  if(old?.status==='Saved'&&input.status==='Draft')throw Error('A saved duty calculation cannot return to draft.');
   if(old&&old.documentReleaseId!==input.documentReleaseId)throw Error('The manifest cannot be changed on a saved duty calculation.');
   if(!['Draft','Saved'].includes(input.status))throw Error('Invalid duty status.');
   const release=ReleaseStore.read().find(r=>r.id===input.documentReleaseId&&r.status==='Released');if(!release)throw Error('Select a released manifest.');
@@ -134,6 +135,7 @@ const DutyStore={
   if(input.header.boeDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(input.header.boeDate)||!Number.isFinite(Date.parse(input.header.boeDate+'T00:00:00Z'))||new Date(input.header.boeDate+'T00:00:00Z').toISOString().slice(0,10)!==input.header.boeDate||input.header.boeDate>date))throw Error('Bill of Entry date must be valid and no later than costing date.');
   const result=this.calculate(basis,input.rows,input.header.rate,input.processingTotals??null);this.validateConfiguredHeads(basis,result,old);if(input.status==='Saved'&&result.totalAV===null)throw Error('Enter the actual assessable value for every manifest item.');if(input.status==='Saved'&&result.totalActual===null)throw Error('Enter an actual value for every duty head. Enter 0 for heads that do not apply.');const now=new Date().toISOString();
   const record={...input,header:{...input.header,boeNumber},...result,basis,portReceiptId:release.portReceiptId,manifestNumber:basis.manifestNumber,lcOpeningId:basis.lcOpeningId,id:input.id||crypto.randomUUID(),number:old?.number||'DUTY-'+String(records.reduce((max,r)=>Math.max(max,Number(String(r.number).replace('DUTY-',''))||0),0)+1).padStart(6,'0'),revision:(revision||0)+1,updatedAt:now,history:old?[...(old.history||[]),{action:'Modified',at:now,before:{header:old.header,rows:old.rows},after:{header:input.header,rows:result.rows}}]:[]};
+  DutyBookings.sync(record,old,records);
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  }
 };
