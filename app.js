@@ -15,21 +15,33 @@ const marginCell=$('m-bank-9').closest('td');marginCell.insertAdjacentHTML('befo
 MARGIN_BANK_NAMES.forEach(name=>$('marginBank').add(new Option(name,name)));
 function syncMarginControls(){const percent=$('marginMode').value==='percent';$('m-bank-9').style.display='none';$('m-bank-9').value=percent?'percent':'fixed';const value=$('v-bank-9');value.style.display='';value.max=percent?'100':'';value.setAttribute('aria-label',percent?'LC Margin percentage':'LC Margin fixed BDT per stock unit');$('marginPercent').value=percent?value.value:'';const hint=value.closest('tr').querySelector('small');if(hint)hint.textContent=($('marginBank').value?'Bank: '+$('marginBank').value+' · ':'')+(percent?'Margin = PI FOB × bank exchange rate × margin %':'Fixed margin in BDT per stock unit')+'; cash margin is excluded from landed cost.';}
 
-const fields=['marginBank','marginMode','marginPercent','category','currency','sku','product','hs','unit','pack','date','version','totalAssessableBDT','pi','fx'];
+const fields=['lcType','tt','ttfx','ttParty','marginBank','marginMode','marginPercent','category','currency','sku','product','hs','unit','pack','date','version','totalAssessableBDT','pi','fx'];
 const n=id=>Number($(id).value)||0;const fmt=v=>v.toLocaleString('en-BD',{minimumFractionDigits:2,maximumFractionDigits:2});let amounts={},totals={};
 function calc(){
+ // A new setup has no costing basis until its visible item selection is valid.
+ if(!$('productSelect').value||!$('sku').value.trim()||$('productSelect').value!==$('sku').value){
+  amounts={};totals={};
+  ['total','unitcost','cfr','supplier'].forEach(id=>$(id).textContent=(id==='total'?'':'BDT ')+fmt(0));
+  $('unitlabel').textContent='Select an item';$('unitcostlabel').textContent='Landed cost / unit';
+  $('valuationHint').textContent='Select a brand, category and item before calculating standard cost.';
+  $('standardBreakdownBasis').textContent='Select an item to calculate landed cost.';$('breakdown').replaceChildren();
+  rows.forEach(row=>{$('a-'+row.id).textContent=fmt(0)});
+  groups.forEach(([key])=>{$('sub-'+key).textContent='Landed-cost subtotal: '+fmt(0)});
+  document.querySelectorAll('#groups .sectionhead .tag').forEach(tag=>tag.textContent='BDT / unit');
+  return {total:0,orderTotal:0,purchase:0,orderPurchase:0,amounts,totals,stockFactor:1,cashMargin:0,ttAmountBDT:0,ttIncluded:false,expenseUnitBasis:'stock',dutyBases:{}};
+ }
  syncStandardTTParty();syncMarginControls();updateStandardCurrency();
  const data={fields:Object.fromEntries(fields.map(id=>[id,$(id).value])),costs:rows.map(row=>({...row,method:$('m-'+row.id).value,value:$('v-'+row.id).value,included:$('i-'+row.id).checked}))};
  const result=StandardCostMath.calculate(data);amounts=result.amounts;totals=result.totals;
  const unit=StandardCostMath.normalize($('unit').value)||'unit',perUnit='BDT / '+unit;
- $('valuationHint').textContent='PI FOB and standard cost heads use one '+unit+'. Additional TT is managed separately through TT Opening.';
- $('supplier').parentElement.firstChild.textContent='PI FOB'+' ('+perUnit+')';
+ $('valuationHint').textContent='All values use one '+unit+'. LC uses PI FOB; LC + TT uses PI FOB plus TT; TT uses only TT. Cash margin is excluded from landed cost.';
+ $('supplier').parentElement.firstChild.textContent='Purchase value'+' ('+perUnit+')';
  $('cfr').textContent='BDT '+fmt(n('pi')*n('fx'));$('supplier').textContent='BDT '+fmt(result.purchase);
  rows.forEach(row=>{$('a-'+row.id).textContent=fmt(amounts[row.id]||0);if(StandardCostMath.isMargin(row)){const checkbox=$('i-'+row.id);checkbox.title='Track LC cash margin only; excluded from landed cost';checkbox.setAttribute('aria-label','Track LC cash margin (excluded from landed cost)')}});
  $('total').textContent=fmt(result.orderTotal);$('unitlabel').textContent=['LTR','KG'].includes(unit)?'pack ('+fmt(result.stockFactor)+' '+unit+')':unit;
  $('unitcostlabel').textContent='Landed cost / '+unit;$('unitcost').textContent='BDT '+fmt(result.total);
  $('standardBreakdownBasis').textContent='Breakdown: '+perUnit;
- $('breakdown').innerHTML=`<div class="sumrow"><span>PI purchase value</span><b>BDT ${fmt(result.purchase)}</b></div>`+groups.filter(([key])=>!['insurance','cf'].includes(key)).map(([key,title])=>{
+ $('breakdown').innerHTML=`<div class="sumrow"><span>${$('lcType').value==='TT'?'TT purchase value':$('lcType').value==='LC+TT'?'PI + TT purchase value':'PI purchase value'}</span><b>BDT ${fmt(result.purchase)}</b></div>`+groups.filter(([key])=>!['insurance','cf'].includes(key)).map(([key,title])=>{
   const subtotal=(totals[key]||0)+(key==='bank'?(totals.insurance||0):key==='port'?(totals.cf||0):0);$('sub-'+key).textContent='Landed-cost subtotal ('+perUnit+'): '+fmt(subtotal);return `<div class="sumrow"><span>${title}</span><b>BDT ${fmt(subtotal)}</b></div>`;
  }).join('');
  document.querySelectorAll('#groups .sectionhead .tag').forEach(tag=>tag.textContent=perUnit);
@@ -43,7 +55,7 @@ function snapshot(){return {fields:Object.fromEntries(fields.map(id=>[id,$(id).v
 function valid(){for(const el of document.querySelectorAll('input'))if(!el.checkValidity()){el.reportValidity();return false}if(!n('pack')||!n('fx')||!$('sku').value.trim()||!$('product').value.trim()||!$('unit').value.trim()||!$('date').value||!$('version').value.trim()){$('notice').textContent='Select a category and item, then enter positive exchange rates.';return false}return true}
 $('save').onclick=()=>{if(!valid())return;const data=snapshot(),all=readStorage();const i=all.findIndex(x=>(normalizeCategory(x.fields.category))===data.fields.category&&x.fields.sku===data.fields.sku&&x.fields.version===data.fields.version&&x.fields.date===data.fields.date);if(i<0)all.push(data);else all[i]=data;try{localStorage.setItem('lc-standards-v1',JSON.stringify(all));list();$('notice').textContent=`Saved ${data.fields.sku} / ${data.fields.version} in this browser.`}catch{$('notice').textContent='Browser storage is unavailable. Export JSON to keep this setup.'}};
 $('saved').onchange=()=>{if($('saved').value==='')return;const data=readStorage()[Number($('saved').value)];removeCustomRows();$('category').value=normalizeCategory(data.fields.category);fields.forEach(id=>{if(data.fields[id]!==undefined)$(id).value=data.fields[id]});rows.forEach(r=>{$('v-'+r.id).value=0});data.costs.forEach(r=>{if(r.custom)addCostRow(r);$('m-'+r.id).value=r.method;$('v-'+r.id).value=r.value;$('i-'+r.id).checked=r.included});syncProducts();calc();$('notice').textContent='Saved standard loaded. Duty costs recalculated from the manually entered total assessable value.'};
-$('new').onclick=()=>{removeCustomRows();fields.filter(x=>['sku','product','hs'].includes(x)).forEach(id=>$(id).value='');rows.forEach(r=>{$('v-'+r.id).value=0});$('marginBank').value='';$('marginMode').value='percent';$('marginPercent').value='';$('totalAssessableBDT').value='';$('pi').value=0;syncProducts();$('notice').textContent='New setup started. Enter SKU details and review valuation inputs.';calc();$('productSelect').focus()};
+$('new').onclick=()=>{removeCustomRows();fields.filter(x=>['sku','product','hs'].includes(x)).forEach(id=>$(id).value='');rows.forEach(r=>{$('v-'+r.id).value=0});$('marginBank').value='';$('marginMode').value='percent';$('marginPercent').value='';$('totalAssessableBDT').value='';$('pi').value=0;$('lcType').value='LC';$('tt').value=0;$('ttfx').value=124;$('ttParty').value='';syncProducts();$('notice').textContent='New setup started. Enter SKU details and review valuation inputs.';calc();$('productSelect').focus()};
 $('export').onclick=()=>{if(!valid())return;const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='standard-cost.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};initEnhancements();list();calc();
 
 const inventoryNavigation=document.createElement('a');inventoryNavigation.href='inventory.html';inventoryNavigation.className='nav';inventoryNavigation.textContent='13   Inventory stock report';$('workflow').append(inventoryNavigation);

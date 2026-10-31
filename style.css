@@ -8,3 +8,8 @@ output{display:block;padding:10px;margin-top:7px;background:#f2f7fa;border:1px s
 .standard-cost-action{white-space:nowrap;width:1%;text-align:center}.standard-cost-delete{color:#b42318;border-color:#efc4bf;padding:6px 9px}.standard-cost-delete:hover{background:#fff1ef}
 
 .standard-lc-locked{background-color:#f4f5f7!important;cursor:not-allowed}#standardLCLock{border-left:3px solid #b7791f;color:#714b12}
+
+/* Keep valuation controls in one grid with consistent row spacing. */
+.fields.valuation-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 16px;align-items:start}.valuation-fields label{min-width:0}.valuation-fields input,.valuation-fields select{height:40px}
+@media(max-width:700px){.fields.valuation-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.fields.valuation-fields{grid-template-columns:minmax(0,1fr)}}

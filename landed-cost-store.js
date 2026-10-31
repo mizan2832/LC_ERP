@@ -72,18 +72,33 @@ const LandedStore={
   return {...JSON.parse(JSON.stringify(bank.basis)),linkedTT,paymentMode:LCStore.read().find(r=>r.id===bank.lcOpeningId)?.header.pay||'',bankCustomsExpenseId:bank.id,bankNumber:bank.number,dutyCalculationId:duty.id,dutyNumber:duty.number,sourceDate:bank.header.costDate,rows,sourceVersions:{bank:bank.revision,duty:duty.revision,openingExpenses:expenses.map(e=>({id:e.id,revision:e.revision}))}};
  },
  allocateTT(basis,extras,ttInput){if(ttInput.total===''||ttInput.total===null||!Number.isFinite(Number(ttInput.total))||Number(ttInput.total)<0)throw Error('Enter a non-negative total TT amount.');const allocation=CostAllocation.calculate(basis.rows,[{headKey:'extra:tt',headName:'TT amount',amount:Number(ttInput.total)}]);return extras.map(extra=>{const line=allocation.lines.find(r=>r.itemCode===extra.itemCode&&r.uom===extra.uom);if(!line)throw Error('TT allocation item missing.');return {...extra,tt:line.allocatedExpense,ttParty:String(ttInput.party||'').trim()}})},
+ financingRows(basis){
+  const rows=JSON.parse(JSON.stringify(basis.rows));
+  if(basis.margin===undefined||basis.margin===null||basis.margin===''||basis.loanType==='LATR'&&(basis.loanValue===undefined||basis.loanValue===null||basis.loanValue===''))throw Error('Manifest margin or LATR is missing from the saved document release. Complete the source release first.');
+  const margin=Number(basis.margin),latr=basis.loanType==='LATR'?Number(basis.loanValue):0;
+  if(!Number.isFinite(margin)||margin<0||!Number.isFinite(latr)||latr<0)throw Error('The saved document release must contain valid manifest margin and LATR amounts.');
+  const heads=[{headKey:'funding:margin',headName:'Manifest margin',amount:margin},{headKey:'funding:latr',headName:'Manifest LATR',amount:latr}];
+  const allocation=CostAllocation.calculate(rows,heads),funding=margin+latr;
+  rows.forEach((row,i)=>{
+   const purchase=row.costs.filter(c=>c.key==='fob'),standard=purchase.reduce((sum,c)=>sum+Number(c.standard||0),0);
+   // Preserve the standard purchase total; split its presentation in the same funding ratio.
+   const standardMargin=funding>0?this.round(standard*margin/funding):0;
+   row.costs=row.costs.filter(c=>c.key!=='fob'&&!String(c.key).startsWith('funding:'));
+   allocation.lines[i].allocations.forEach((part,j)=>row.costs.splice(j,0,{key:part.headKey,name:part.headName,source:basis.releaseNumber||'Document release',actual:part.amount,standard:j===0?standardMargin:this.round(standard-standardMargin),partyCode:''}));
+  });return rows;
+ },
  calculate(basis,extras,ttInput=null){
   if(basis.linkedTT){extras=extras.map(r=>({...r,tt:0,ttParty:''}));ttInput=null}
   if(ttInput)extras=this.allocateTT(basis,extras,ttInput);
   if(extras.length!==basis.rows.length)throw Error('Enter TT and assembly values for each manifest SKU.');const seen=new Set();
-  const rows=basis.rows.map(item=>{
+  const rows=this.financingRows(basis).map(item=>{
    const key=item.itemCode+'|'+item.uom,input=extras.find(r=>r.itemCode===item.itemCode&&r.uom===item.uom);if(!input||seen.has(key))throw Error('Invalid additional-cost SKU.');seen.add(key);
    const values={};for(const name of ['tt','assembly']){const value=Number(input[name]);if(input[name]===''||!Number.isFinite(value)||value<0)throw Error('Enter non-negative '+name+' amount for '+item.itemCode);values[name]=value}
    const costs=[...JSON.parse(JSON.stringify(item.costs.filter(cost=>!this.isCashMargin(cost)))),...(!basis.linkedTT&&(values.tt>0||this.standardTTAmount(item)>0)?[{key:'extra:tt',name:'TT amount',source:'Landed cost entry',actual:values.tt,standard:this.standardTTAmount(item),partyCode:String(input.ttParty||'').trim()}]:[]),{key:'extra:assembly',name:'Assembly cost',source:'Landed cost entry',actual:values.assembly,standard:item.standardAssembly,partyCode:String(input.assemblyParty||'').trim()}].map(c=>({...c,actual:this.round(c.actual),standard:this.round(c.standard),variance:this.round(c.actual-c.standard)}));
    const totalActual=this.round(costs.reduce((s,c)=>s+c.actual,0)),totalStandard=this.round(costs.reduce((s,c)=>s+c.standard,0));
    return {...item,standardTT:this.standardTTAmount(item),costs,totalActual,totalStandard,variance:this.round(totalActual-totalStandard),actualPerUnit:totalActual/item.qty,standardPerUnit:totalStandard/item.qty,actualPerStockUnit:totalActual/item.stockQty,standardPerStockUnit:totalStandard/item.stockQty};
   });
-  return {rows,marginIncludedInLandedCost:false,totalActual:this.round(rows.reduce((s,r)=>s+r.totalActual,0)),totalStandard:this.round(rows.reduce((s,r)=>s+r.totalStandard,0)),totalVariance:this.round(rows.reduce((s,r)=>s+r.variance,0))};
+  return {rows,marginIncludedInLandedCost:true,purchaseValuationBasis:'manifest-margin-plus-latr',totalActual:this.round(rows.reduce((s,r)=>s+r.totalActual,0)),totalStandard:this.round(rows.reduce((s,r)=>s+r.totalStandard,0)),totalVariance:this.round(rows.reduce((s,r)=>s+r.variance,0))};
  },
  save(input,revision){
   const records=this.read(),index=records.findIndex(r=>r.id===input.id),old=records[index];

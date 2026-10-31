@@ -1,11 +1,11 @@
 function normalizeStandardValuation(data){
  const copy={...data,fields:{...data.fields},costs:(data.costs||[]).map(cost=>({...cost}))},f=copy.fields,c=data.calculation||{};
- delete f.lcType;
+ f.lcType=f.lcType||'LC';f.tt=f.tt??0;f.ttfx=f.ttfx??f.fx??124;f.ttParty=f.ttParty||'';
  if(f.totalAssessableBDT===undefined){
   const saved=c.customsAssessableValue;
   f.totalAssessableBDT=saved!==undefined&&saved!==null?saved:f.assUsd!==undefined&&f.assUsd!==''?Number(f.assUsd)*Number(f.cfx??f.fx??0)+Number(f.landingBDT??c.landingCharge??0)+Number(f.psiBDT??c.psiAssessableValue??0):'';
  }
- delete f.tt;delete f.ttfx;delete f.ttParty;
+
  // Convert an old foreign-currency freight input to a BDT stock-unit head in memory.
  const freight=Number(f.freight||0),fx=Number(f.fx||0);
  if(freight>0&&fx>0){
