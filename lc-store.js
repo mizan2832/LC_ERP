@@ -20,17 +20,21 @@ const LCStore={
    const source=pi?.rows.find(r=>r.itemCode===line.itemCode&&Number(r.qty)===Number(line.qty)&&Math.round(PriceUnits.amount({uom:r.uom||line.uom,convertedUom:r.convertedUom||line.convertedUom,factor:r.conversionFactor??line.factor},r.qty,r.price)*100)===Math.round(Number(line.amountFC)*100));
    snapshot=source?.standardPriceSnapshot||null;
   }
-  let standardFC=null;
+  let standardFC=null,standardLC=null;
   if(snapshot&&Number.isFinite(Number(snapshot.unitPrice))){
-   if(snapshot.currency===currency)standardFC=Number(snapshot.unitPrice)*Number(line.qty)*(snapshot.priceBasisVersion===2?PriceUnits.factor({uom:line.uom,convertedUom:line.convertedUom,factor:line.factor}):1);
-   else{
+   const quantity=Number(line.qty)*(snapshot.priceBasisVersion===2?PriceUnits.factor({uom:line.uom,convertedUom:line.convertedUom,factor:line.factor}):1);
+   const sourceAmount=Number(snapshot.unitPrice)*quantity;
+   let sourceFX=Number(snapshot.fx);
+   if(!(sourceFX>0)){
     const standards=JSON.parse(localStorage.getItem('lc-standards-v1')||'[]');
     const setup=Array.isArray(standards)?standards.find(r=>r.setupNumber===snapshot.setupNumber&&r.fields?.currency===snapshot.currency):null;
-    const sourceFX=Number(snapshot.fx??setup?.fields.fx);if(sourceFX>0&&Number(rate)>0)standardFC=Number(snapshot.unitPrice)*Number(line.qty)*(snapshot.priceBasisVersion===2?PriceUnits.factor({uom:line.uom,convertedUom:line.convertedUom,factor:line.factor}):1)*sourceFX/Number(rate);
+    sourceFX=Number(setup?.fields.fx);
    }
+   if(sourceFX>0){standardLC=Math.round(sourceAmount*sourceFX*100)/100;snapshot={...snapshot,fx:sourceFX}}
+   if(snapshot.currency===currency)standardFC=sourceAmount;
+   else if(standardLC!==null&&Number(rate)>0)standardFC=standardLC/Number(rate);
   }
   if(standardFC!==null)standardFC=Math.round(standardFC*100)/100;
-  const standardLC=standardFC===null?null:Math.round(standardFC*Number(rate)*100)/100;
   return {...line,standardPriceSnapshot:snapshot||null,standardTotalFC:standardFC,standardTotalLC:standardLC,varianceFC:standardFC===null?null:Math.round((Number(line.amountFC)-standardFC)*100)/100,varianceLC:standardLC===null?null:Math.round((Number(line.amountLC)-standardLC)*100)/100};
  },
  piAmountFC(pi){return this.details([pi],0).reduce((sum,row)=>sum+Number(row.amountFC),0)},
