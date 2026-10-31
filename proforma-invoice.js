@@ -3,7 +3,7 @@ let invoiceId='',invoiceRevision=0,invoiceStatus='New',invoiceRows=[],uploadFile
 const fmtPI=v=>Number(v||0).toLocaleString('en-BD',{minimumFractionDigits:2,maximumFractionDigits:2});
 const escPI=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function message(text,error=false){el('message').textContent=text;el('message').className=error?'error':'success';el('message').scrollIntoView({block:'nearest'})}
-function refreshRequisitions(){const previous=el('requisition').value;el('requisition').replaceChildren(new Option('Select approved requisition',''));PRStore.read().filter(r=>r.status==='Approved').forEach(r=>el('requisition').add(new Option(r.number+' · '+r.header.party,r.number)));el('requisition').value=previous}
+function refreshRequisitions(){const previous=el('requisition').value;el('requisition').replaceChildren(new Option('Select approved requisition',''));RecordPickerOrder.latest(PRStore.read()).filter(r=>r.status==='Approved').forEach(r=>el('requisition').add(new Option(r.number+' · '+r.header.party,r.number)));el('requisition').value=previous}
 function piUnitVariance(row){
  const snapshot=row.standardPriceSnapshot;if(!snapshot)return 'Not captured';
  if(snapshot.currency!==el('currency').value)return 'Currency differs';

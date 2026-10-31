@@ -6,11 +6,11 @@ function drMessage(text,error=false){dr('message').textContent=text;dr('message'
 function releaseLists(){
  const selected=dr('manifest').value,records=ReleaseStore.read();
  dr('manifest').replaceChildren(new Option('Select received manifest',''));
- PortStore.read().filter(r=>r.status==='Received'&&(!records.some(d=>d.portReceiptId===r.id&&d.id!==releaseId&&d.status!=='Cancelled'))).forEach(receipt=>{
+ RecordPickerOrder.latest(PortStore.read()).filter(r=>r.status==='Received'&&(!records.some(d=>d.portReceiptId===r.id&&d.id!==releaseId&&d.status!=='Cancelled'))).forEach(receipt=>{
   const lc=LCStore.read().find(l=>l.id===receipt.lcOpeningId),label=receipt.header.manifest+' · LC '+(lc?.number||'')+' · '+receipt.number;
   dr('manifest').add(new Option(label,receipt.id));
  });dr('manifest').value=selected;
- dr('savedRelease').replaceChildren(new Option('Select saved release',''));records.forEach(r=>dr('savedRelease').add(new Option(r.number+' · '+r.manifestNumber+' · '+r.status+' · '+r.glStatus,r.id)));
+ dr('savedRelease').replaceChildren(new Option('Select saved release',''));RecordPickerOrder.latest(records).forEach(r=>dr('savedRelease').add(new Option(r.number+' · '+r.manifestNumber+' · '+r.status+' · '+r.glStatus,r.id)));
 }
 function renderManifestDetails(calc){
  const rows=calc.rows.filter(row=>row.manifestQty>0);

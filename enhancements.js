@@ -20,3 +20,11 @@ groups.forEach(([key])=>{const section=$('sub-'+key).parentElement;const control
 $('category').onchange=()=>{applyProduct(null);$('unit').value=$('category').value==='Goodyear lubricants'?'Litre':'Piece';$('pack').value=1;removeCustomRows();rows.forEach(r=>{$('v-'+r.id).value=0});$('totalAssessableBDT').value='';$('pi').value=0;syncProducts();calc();$('notice').textContent='Select an item to fetch its HS code and enter standard costs.'};
 $('productSelect').onchange=()=>{const p=catalog().find(p=>p.category===$('category').value&&p.sku===$('productSelect').value);applyProduct(p);calc();$('notice').textContent='Item and HS code loaded from the item dataset.'};
 $('search').addEventListener('input',list);$('save').addEventListener('click',syncProducts);syncProducts();}
+
+function syncFixedProcessingControls(){
+ rows.filter(row=>row.key==='global').forEach(row=>{
+  const method=$('m-'+row.id);if(!method)return;
+  Array.from(method.options).filter(option=>option.value!=='fixed').forEach(option=>option.remove());method.value='fixed';
+  const hint=$('v-'+row.id)?.closest('tr')?.querySelector('small');if(hint)hint.textContent='Fixed BDT per stock unit';
+ });
+}

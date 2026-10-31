@@ -6,16 +6,18 @@ portExpenseSection.querySelector('h2').lastChild.textContent='Port, C & F Expens
 portExpenseSection.querySelector('tbody').append(...cfExpenseSection.querySelector('tbody').children);
 $('sub-cf').hidden=true;portExpenseSection.append($('sub-cf'));cfExpenseSection.remove();
 const standardEditorGroup=key=>key==='cf'?'port':key==='insurance'?'bank':key;
+const defaultStandardHeads=new Set(['duty-0','duty-1','duty-2','duty-3','duty-4','duty-5','global-0','global-1','global-2']);
 const chosenStandardHeads=new Set();
 const standardHeadCatalog=new Map();
 function rememberStandardHeads(){
  rows.forEach(row=>standardHeadCatalog.set(row.id,{...row}));
  readStorage().forEach(setup=>(setup.costs||[]).forEach(row=>{
+  if(row.id==='duty-6')return;
   if(!standardHeadCatalog.has(row.id))standardHeadCatalog.set(row.id,{...row});
  }));
 }
 function standardRowHasCost(row){return Boolean($('i-'+row.id)?.checked)&&Number($('v-'+row.id)?.value)>0}
-function standardRowVisible(row){if(/assembl/i.test(row.name))return false;return Boolean($('i-'+row.id)?.checked)&&(standardRowHasCost(row)||chosenStandardHeads.has(row.id))}
+function standardRowVisible(row){if(/assembl/i.test(row.name)||row.id==='duty-6')return false;if(defaultStandardHeads.has(row.id))return true;return Boolean($('i-'+row.id)?.checked)&&(standardRowHasCost(row)||chosenStandardHeads.has(row.id))}
 function standardHeadChoices(key,currentId=''){
  key=standardEditorGroup(key);
  const names=new Set(),choices=[];

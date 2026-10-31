@@ -4,7 +4,7 @@ $('productSelect').onchange=()=>{
  if(window.beginStandardVersionCopy)window.beginStandardVersionCopy();
  selectStandardItem();if(!$('sku').value)return;
  currentSetupNumber='';$('saved').value='';$('version').value='STD-001';
- removeCustomRows();rows.forEach(r=>{$('v-'+r.id).value=0;$('i-'+r.id).checked=true;$('m-'+r.id).value='fixed'});
+ removeCustomRows();rows.forEach(r=>{$('v-'+r.id).value=0;$('i-'+r.id).checked=true;$('m-'+r.id).value=/^duty-[0-5]$/.test(r.id)?'percent':'fixed'});
  $('totalAssessableBDT').value='';$('pi').value=0;$('lcType').value='LC';
  $('tt').value=0;$('ttfx').value=124;$('ttParty').value='';$('currency').value='USD';$('fx').value=124;
  $('marginBank').value='';$('marginMode').value='percent';$('marginPercent').value='';

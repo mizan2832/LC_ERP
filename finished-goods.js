@@ -1,7 +1,7 @@
 const fg=id=>document.getElementById(id),fgEscape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),fgFmt=v=>Number(v||0).toLocaleString('en-BD',{minimumFractionDigits:2,maximumFractionDigits:2});let fgBasis=null,fgSaved=false;
 function fgMessage(text,error=false){fg('message').textContent=text;fg('message').className=error?'error':'success'}
 let fgPickerMode='manifest';
-function fgPendingManifests(){const receipts=FinishedStore.read();return LandedStore.read().filter(record=>record.status==='Saved'&&!receipts.some(receipt=>receipt.status!=='Cancelled'&&(receipt.portReceiptId===record.portReceiptId||receipt.landedCostId===record.id)))}
+function fgPendingManifests(){const receipts=FinishedStore.read();return RecordPickerOrder.latest(LandedStore.read()).filter(record=>record.status==='Saved'&&!receipts.some(receipt=>receipt.status!=='Cancelled'&&(receipt.portReceiptId===record.portReceiptId||receipt.landedCostId===record.id)))}
 function fgLists(){
  fg('manifest').value=fgBasis?.manifest||fgBasis?.header?.manifest||'';
  fg('saved').value=fgSaved?fgBasis.number:'';
@@ -13,7 +13,7 @@ function fgDrawPicker(){
   fg('fgPickerTitle').textContent=saved?'Open saved finished goods receipt':'Select manifest awaiting finished goods receipt';
   const headings=saved?['Receipt number','Manifest','LC number','Receive date','Status','Action']:['Manifest','Landed cost number','LC number','Landed cost date','Action'];
   fg('fgPickerHead').innerHTML='<tr>'+headings.map(text=>'<th>'+text+'</th>').join('')+'</tr>';fg('fgPickerRows').replaceChildren();
-  const records=(saved?FinishedStore.read():fgPendingManifests()).filter(record=>[record.number,record.manifest,record.manifestNumber,record.basis?.manifestNumber,record.lcNumber,record.basis?.lcNumber,record.status].join(' ').toLowerCase().includes(query));
+  const records=RecordPickerOrder.latest(saved?FinishedStore.read():fgPendingManifests()).filter(record=>[record.number,record.manifest,record.manifestNumber,record.basis?.manifestNumber,record.lcNumber,record.basis?.lcNumber,record.status].join(' ').toLowerCase().includes(query));
   records.forEach(record=>{
    const manifest=record.manifest||record.manifestNumber||record.basis?.manifestNumber||record.portReceiptId;
    const values=saved?[record.number,manifest,record.lcNumber,record.receiveDate,record.status]:[manifest,record.number,record.basis?.lcNumber||record.lcNumber,record.header?.costDate];

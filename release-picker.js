@@ -6,7 +6,7 @@ document.body.append(releasePicker);
 function drawReleasePicker(){
  try{
   const query=dr('releasePickerSearch').value.trim().toLowerCase(),body=dr('releasePickerRows');body.replaceChildren();
-  ReleaseStore.read().filter(record=>[record.number,record.manifestNumber,record.basis?.lcNumber,record.status].join(' ').toLowerCase().includes(query)).forEach(record=>{
+  RecordPickerOrder.latest(ReleaseStore.read()).filter(record=>[record.number,record.manifestNumber,record.basis?.lcNumber,record.status].join(' ').toLowerCase().includes(query)).forEach(record=>{
    const tr=document.createElement('tr');
    tr.innerHTML=`<td>${drEscape(record.number)}</td><td>${drEscape(record.manifestNumber)}</td><td>${drEscape(record.basis?.lcNumber)}</td><td>${drEscape(record.status)}</td><td>${drEscape(record.glStatus)}</td><td><button type="button">Open</button></td>`;
    tr.querySelector('button').onclick=()=>{
