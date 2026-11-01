@@ -1,6 +1,6 @@
 function normalizeStandardValuation(data){
  const copy={...data,fields:{...data.fields},costs:(data.costs||[]).map(cost=>({...cost}))},f=copy.fields,c=data.calculation||{};
- f.lcType=f.lcType||'LC';f.tt=f.tt??0;f.ttfx=f.ttfx??f.fx??124;f.ttParty=f.ttParty||'';
+ f.lcType=f.lcType||'LC';f.tt=f.tt??0;f.ttfx=f.ttfx??f.fx??124;delete f.ttParty;
  if(f.totalAssessableBDT===undefined){
   const saved=c.customsAssessableValue;
   f.totalAssessableBDT=saved!==undefined&&saved!==null?saved:f.assUsd!==undefined&&f.assUsd!==''?Number(f.assUsd)*Number(f.cfx??f.fx??0)+Number(f.landingBDT??c.landingCharge??0)+Number(f.psiBDT??c.psiAssessableValue??0):'';
