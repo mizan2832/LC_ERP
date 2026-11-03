@@ -2,3 +2,4 @@
 .invoice-items{min-width:2200px}.invoice-totals strong{max-width:380px;line-height:1.5;overflow-wrap:anywhere}
 .approval-shell .pi-actions{justify-content:center;flex-wrap:wrap;margin:0 0 18px}.approval-shell dialog#modifyPicker{width:min(850px,94vw);max-height:80vh;overflow:auto;border:1px solid #dce5ed;border-radius:8px;padding:24px}.approval-shell dialog#modifyPicker::backdrop{background:#112b4088}#modifyPicker table{min-width:600px}#modifyPicker .table-wrap{margin-top:15px}.invoice-heading .toolbar{justify-content:center;flex-wrap:wrap}
 .invoice-items .pi-variance{background:#fff8e8;text-align:right;min-width:120px;font-weight:600}
+.approval-shell .invoice-grid #ckdGroupSummary{grid-column:1/-1;margin:0;padding:10px 12px;border-left:3px solid #168970;background:#eef8f5;color:#365b52}

@@ -39,3 +39,37 @@ ln('newLanded').onclick=newLanded;ln('draftLanded').onclick=()=>saveLanded('Draf
 ln('cancelLanded').onclick=()=>{try{loadLanded(Rollback.cancel(LandedStore,landedId,landedRevision,id=>LandedStore.blocked(id)));landedMessage('Landed cost cancelled.')}catch(error){landedMessage(error.message,true)}};
 window.addEventListener('storage',e=>{if([LandedStore.key,BankCustomsStore.key,DutyStore.key,ExpenseStore.key,'lc-finished-goods-receipts-v1'].includes(e.key)){renderLanded();landedMessage('Related records changed. Reload before saving.',true)}});
 newLanded();
+
+// Show the merged actual valuation only on the saved final CKD manifest entry.
+const ckdActualPanel=document.createElement('div');ckdActualPanel.className='ckd-actual-merge';ckdActualPanel.hidden=true;
+function renderCKDActualMerge(record){
+ ckdActualPanel.replaceChildren();const report=record?.status==='Saved'?record.ckdActualMerge:null;if(!report){ckdActualPanel.hidden=true;return}ckdActualPanel.hidden=false;
+ const heading=document.createElement('h2');heading.textContent='CKD merged actual landed cost';ckdActualPanel.append(heading);
+ const lcNumbers=report.memberLCs.map(lc=>lc.number).join('_');const source=document.createElement('p');source.className='invoice-hint';source.textContent='Merged LCs: '+lcNumbers+' | Complete vehicles: '+report.items.reduce((sum,item)=>sum+item.quantity,0)+' | Actual merged total: '+lf(report.totalActual)+' BDT';ckdActualPanel.append(source);
+ const meta=document.createElement('p');meta.className='invoice-hint';meta.textContent='Merge '+report.reference+' · Triggered by '+record.number+' · '+report.manifestNumbers.length+' completed manifests · Individual LC landed costs remain separate.';ckdActualPanel.append(meta);
+ report.items.forEach(item=>{
+  const sources=document.createElement('p');sources.className='invoice-hint';const describe=rows=>(rows||[]).map(row=>row.lcNumber+' / '+row.manifestNumber+': '+lf(row.quantity)).join(', ');sources.textContent='KIT receipts: '+describe(item.kitManifests)+' | Cabin receipts: '+describe(item.cabinManifests);ckdActualPanel.append(sources);
+  const title=document.createElement('h3');title.textContent=item.itemCode+' · '+lf(item.quantity)+' complete vehicles';ckdActualPanel.append(title);
+  const wrap=document.createElement('div');wrap.className='table-wrap';const table=document.createElement('table');table.className='landed-details';table.innerHTML='<thead><tr><th>Cost head</th><th>KIT actual (BDT)</th><th>Cabin actual (BDT)</th><th>Actual total (BDT)</th><th>Standard total (BDT)</th><th>Variance (BDT)</th></tr></thead>';
+  const body=document.createElement('tbody');item.heads.forEach(head=>{const tr=document.createElement('tr');const kit=head.kitActual??head.kitPerUnit*item.quantity,cabin=head.cabinActual??head.cabinPerUnit*item.quantity;[head.name,lf(kit),lf(cabin),lf(head.actualTotal),lf(head.standardTotal),lf(head.actualTotal-head.standardTotal)].forEach(value=>{const td=document.createElement('td');td.textContent=value;tr.append(td)});body.append(tr)});
+  const total=document.createElement('tr');total.className='landed-total';['Total for '+lf(item.quantity)+' vehicles',lf(item.kitActual),lf(item.cabinActual),lf(item.actualTotal),lf(item.standardTotal),lf(item.actualTotal-item.standardTotal)].forEach(value=>{const td=document.createElement('td');td.textContent=value;total.append(td)});body.append(total);table.append(body);wrap.append(table);ckdActualPanel.append(wrap)
+ });
+ ln('costBreakdown').append(ckdActualPanel);
+}
+const originalLoadLanded=loadLanded;loadLanded=function(record){originalLoadLanded(record);renderCKDActualMerge(record)};
+const originalNewLanded=newLanded;newLanded=function(){originalNewLanded();renderCKDActualMerge(null)};
+
+const kitAssemblyPanel=document.createElement('section');kitAssemblyPanel.className='panel';kitAssemblyPanel.hidden=true;
+document.querySelector('.landed-summary').closest('section').before(kitAssemblyPanel);
+function renderKITAssembly(){
+ kitAssemblyPanel.replaceChildren();const lc=landedBasis&&LCStore.read().find(r=>r.id===landedBasis.lcOpeningId);
+ const kit=lc&&LCStore.lcClassification(lc).processType==='CKD'&&LCStore.lcClassification(lc).componentType==='KIT';kitAssemblyPanel.hidden=!kit;if(!kit)return;
+ const title=document.createElement('h2');title.textContent='KIT assembly costs';kitAssemblyPanel.append(title);
+ const note=document.createElement('p');note.className='invoice-hint';note.textContent='Enter the actual assembly bill for each KIT item in this manifest and select its payable party.';kitAssemblyPanel.append(note);
+ landedExtras.forEach(extra=>{const row=document.createElement('div');row.className='grid invoice-grid';const label=document.createElement('label');label.textContent=extra.itemCode+' · Assembly cost (BDT)';const amount=document.createElement('input');amount.type='number';amount.min='0';amount.step='any';amount.value=extra.assembly||0;amount.disabled=landedLocked();amount.oninput=()=>{extra.assembly=amount.value;landedTotals()};label.append(amount);const partyLabel=document.createElement('label');partyLabel.textContent='Assembly party (code and name)';const parties=ExpenseParties.list('assembly');const selected=String(extra.assemblyParty||'');const party=document.createElement('select');party.add(new Option('Select assembly party',''));if(selected&&!parties.some(p=>p.code===selected))party.add(new Option(selected+' · saved party',selected));parties.forEach(p=>party.add(new Option(p.code+' · '+p.name,p.code)));party.value=selected;party.disabled=landedLocked();party.onchange=()=>{extra.assemblyParty=party.value};partyLabel.append(party);row.append(label,partyLabel);kitAssemblyPanel.append(row)});
+}
+const renderLandedBeforeAssembly=renderLanded;renderLanded=function(){renderLandedBeforeAssembly();renderKITAssembly()};
+const renderLandedBeforeCKD=renderLanded;renderLanded=function(){renderLandedBeforeCKD();if(!landedBasis){renderCKDActualMerge(null);return}try{const saved=landedId&&LandedStore.read().find(r=>r.id===landedId);if(saved?.status==='Saved'&&saved.ckdActualMerge){renderCKDActualMerge(saved);return}const rows=LandedStore.calculate(landedBasis,landedExtras).rows;const preview={id:landedId||'ckd-preview',status:'Saved',lcOpeningId:landedBasis.lcOpeningId,portReceiptId:landedBasis.portReceiptId,rows,number:landedId?ln('landedNumber').value:'Preview'};const records=LandedStore.read().filter(r=>r.id!==preview.id).concat(preview),report=LandedStore.ckdActualMerge(preview,records);renderCKDActualMerge(report?{...preview,ckdActualMerge:report}:null)}catch(error){renderCKDActualMerge(null)}};
+document.querySelectorAll('main.app p.invoice-hint').forEach(note=>{
+ if(note.textContent.includes('LC cash margin is excluded'))note.textContent='Manifest margin and LATR are included in this page’s actual landed valuation. CKD component costs are merged only when the final required manifest is fully received and costed.';
+});

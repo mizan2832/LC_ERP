@@ -13,3 +13,4 @@
 .lc-report-heads .lc-cost-group{background:#dfefe7;font-weight:bold}.lc-report-heads .lc-cost-group td{text-align:left}.lc-report-heads .lc-cost-subtotal{background:#edf2f7;font-weight:bold}
 
 #lcTTBalance.tt-balance-error{color:#b42318;font-weight:600}#lcTTBalance.tt-balance-success{color:#168970}#lcTTBalance:empty{display:none}
+.ckd-merge-summary{margin-top:18px;padding:16px;border:1px solid #b9d8cc;border-radius:7px;background:#f3faf7}.ckd-merge-summary h3{margin:0 0 10px;color:#24614f;font-size:15px}.ckd-merge-summary p{font-size:12px;line-height:1.5}.ckd-merge-table{min-width:1050px}.ckd-merge-table td:nth-child(n+2){text-align:right}.ckd-merge-total{font-weight:700;color:#24614f;margin-bottom:0}#lcComponentLabel[hidden],#lcMergeLabel[hidden],#lcMergeSummary[hidden]{display:none}

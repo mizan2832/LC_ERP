@@ -122,3 +122,34 @@ const LandedStore={
   if(index>=0)records[index]=record;else records.push(record);localStorage.setItem(this.key,JSON.stringify(records));return record;
  }
 };
+
+// The merged actual CKD report belongs to the entry that completes the last
+// manifest. Earlier manifest entries retain only their individual valuation.
+(()=>{
+ const baseSave=LandedStore.save;
+ LandedStore.ckdActualMerge=function(trigger,records=this.read()){
+  if(trigger.status!=='Saved')return null;
+  const lcRecords=LCStore.read(),group=LCStore.mergeGroups(lcRecords).find(candidate=>candidate.memberIds.has(trigger.lcOpeningId));
+  if(!group)return null;
+  const members=group.members,receipts=PortStore.read().filter(r=>r.status==='Received'&&group.memberIds.has(r.lcOpeningId));
+  const received=new Map();receipts.forEach(receipt=>receipt.rows.forEach(row=>{const key=receipt.lcOpeningId+'|'+row.sourceKey;received.set(key,(received.get(key)||0)+Number(row.qty||0))}));
+  for(const lc of members){for(let index=0;index<(lc.rows||[]).length;index++){const line=lc.rows[index],key=lc.id+'|'+line.piId+':'+index;if(Math.abs((received.get(key)||0)-Number(line.qty||0))>0.000001)return null}}
+  const savedByReceipt=new Map(records.filter(r=>r.status==='Saved').map(r=>[r.portReceiptId,r]));
+  if(receipts.some(receipt=>!savedByReceipt.has(receipt.id)))return null;
+  const buckets=new Map();receipts.forEach(receipt=>{
+   const lc=members.find(member=>member.id===receipt.lcOpeningId),component=LCStore.lcClassification(lc).componentType,landed=savedByReceipt.get(receipt.id);
+   if(!['KIT','CABIN'].includes(component))return;
+   landed.rows.forEach(row=>{const key=String(row.itemCode||'').toUpperCase(),entry=buckets.get(key)||{itemCode:key,itemName:row.itemName||key,KIT:{qty:0,actual:0,standard:0,heads:new Map(),manifests:[]},CABIN:{qty:0,actual:0,standard:0,heads:new Map(),manifests:[]}};const part=entry[component];part.qty+=Number(row.qty||0);part.actual+=Number(row.totalActual||0);part.standard+=Number(row.totalStandard||0);part.manifests.push({lcNumber:lc.number,manifestNumber:receipt.header?.manifest||receipt.number,landedNumber:landed.number,quantity:Number(row.qty||0),actual:Number(row.totalActual||0)});row.costs.forEach(cost=>{const id=String(cost.key||cost.name),head=part.heads.get(id)||{key:id,name:cost.name,actual:0,standard:0};head.actual+=Number(cost.actual||0);head.standard+=Number(cost.standard||0);part.heads.set(id,head)});buckets.set(key,entry)})
+  });
+  if(!buckets.size||[...buckets.values()].some(entry=>!entry.KIT.qty||!entry.CABIN.qty||Math.abs(entry.KIT.qty-entry.CABIN.qty)>0.000001))return null;
+  const items=[...buckets.values()].map(entry=>{
+   const quantity=entry.KIT.qty,ids=new Set([...entry.KIT.heads.keys(),...entry.CABIN.heads.keys()]);
+   const heads=[...ids].map(id=>{const kit=entry.KIT.heads.get(id),cabin=entry.CABIN.heads.get(id),kitActual=Number(kit?.actual||0),cabinActual=Number(cabin?.actual||0),kitPerUnit=kitActual/quantity,cabinPerUnit=cabinActual/quantity,kitStandard=Number(kit?.standard||0)/quantity,cabinStandard=Number(cabin?.standard||0)/quantity;return {key:id,name:kit?.name||cabin?.name||id,kitActual,cabinActual,kitPerUnit,cabinPerUnit,actualPerVehicle:kitPerUnit+cabinPerUnit,standardPerVehicle:kitStandard+cabinStandard,actualTotal:kitActual+cabinActual,standardTotal:Number(kit?.standard||0)+Number(cabin?.standard||0)}});
+   return {itemCode:entry.itemCode,itemName:entry.itemName,quantity,kitActual:entry.KIT.actual,cabinActual:entry.CABIN.actual,kitManifests:entry.KIT.manifests,cabinManifests:entry.CABIN.manifests,actualPerVehicle:(entry.KIT.actual+entry.CABIN.actual)/quantity,standardPerVehicle:(entry.KIT.standard+entry.CABIN.standard)/quantity,actualTotal:entry.KIT.actual+entry.CABIN.actual,standardTotal:entry.KIT.standard+entry.CABIN.standard,heads};
+  });
+  return {reference:group.reference,triggerLandedId:trigger.id,sourceLandedIds:receipts.map(r=>savedByReceipt.get(r.id).id),memberLCs:members.map(lc=>({id:lc.id,number:lc.number,componentType:LCStore.lcClassification(lc).componentType})),manifestNumbers:receipts.map(r=>r.header?.manifest||r.number),items,totalActual:items.reduce((sum,item)=>sum+item.actualTotal,0),totalStandard:items.reduce((sum,item)=>sum+item.standardTotal,0),generatedAt:new Date().toISOString()};
+ };
+ LandedStore.save=function(input,revision){const saved=baseSave.call(this,input,revision);if(saved.status!=='Saved')return saved;const records=this.read(),report=this.ckdActualMerge(saved,records);if(!report)return saved;const index=records.findIndex(r=>r.id===saved.id);records[index]={...saved,ckdActualMerge:report};localStorage.setItem(this.key,JSON.stringify(records));return records[index]};
+ const baseBlocked=LandedStore.blocked;
+ LandedStore.blocked=function(id){const reason=baseBlocked.call(this,id);if(reason)return reason;const final=this.read().find(record=>record.status==='Saved'&&record.id!==id&&record.ckdActualMerge?.sourceLandedIds?.includes(id));return final?'CKD merged actual cost exists on '+final.number+'. Cancel that final merged entry first.':''};
+})();

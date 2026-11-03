@@ -10,6 +10,7 @@ const ExpenseParties={
   {code:'CNF-001',name:'Sample C&F Agent - Chattogram',group:'cf'},
   {code:'CNF-002',name:'Sample C&F Agent - Mongla',group:'cf'},
   {code:'TRN-001',name:'Sample Transport Company',group:'local'},
+  {code:'ASM-001',name:'Sample Vehicle Assembly Partner',group:'assembly'},
   {code:'TEST-001',name:'Sample Testing and Inspection Services',group:'local'},
   {code:'DUTY-CTG',name:'Chattogram Customs House',group:'duty'},
   {code:'DUTY-MGL',name:'Mongla Customs House',group:'duty'}
