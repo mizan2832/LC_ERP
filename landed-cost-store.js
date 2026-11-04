@@ -78,13 +78,16 @@ const LandedStore={
   const margin=Number(basis.margin),latr=basis.loanType==='LATR'?Number(basis.loanValue):0;
   if(!Number.isFinite(margin)||margin<0||!Number.isFinite(latr)||latr<0)throw Error('The saved document release must contain valid manifest margin and LATR amounts.');
   const heads=[{headKey:'funding:margin',headName:'Manifest margin',amount:margin},{headKey:'funding:latr',headName:'Manifest LATR',amount:latr}];
-  const allocation=CostAllocation.calculate(rows,heads),funding=margin+latr;
+  const allocation=CostAllocation.calculate(rows,heads);
   rows.forEach((row,i)=>{
    const purchase=row.costs.filter(c=>c.key==='fob'),standard=purchase.reduce((sum,c)=>sum+Number(c.standard||0),0);
-   // Preserve the standard purchase total; split its presentation in the same funding ratio.
-   const standardMargin=funding>0?this.round(standard*margin/funding):0;
+   const setup=row.standardSnapshot,marginUnit=Number(setup?.calculation?.cashMargin??(setup?StandardCostMath.calculate(setup).cashMargin:0));
+   if(!Number.isFinite(marginUnit)||marginUnit<0)throw Error(row.itemCode+': saved standard LC margin is invalid.');
+   const standardMargin=this.round(marginUnit*Number(row.qty)*StandardCostMath.factor(setup,row));
+   const standardLATR=this.round(standard-standardMargin);
+   if(standardLATR<0)throw Error(row.itemCode+': standard LC margin exceeds the manifest PI value. Check the saved standard setup.');
    row.costs=row.costs.filter(c=>c.key!=='fob'&&!String(c.key).startsWith('funding:'));
-   allocation.lines[i].allocations.forEach((part,j)=>row.costs.splice(j,0,{key:part.headKey,name:part.headName,source:basis.releaseNumber||'Document release',actual:part.amount,standard:j===0?standardMargin:this.round(standard-standardMargin),partyCode:''}));
+   allocation.lines[i].allocations.forEach((part,j)=>row.costs.splice(j,0,{key:part.headKey,name:part.headName,source:basis.releaseNumber||'Document release',actual:part.amount,standard:part.headKey==='funding:margin'?standardMargin:standardLATR,partyCode:''}));
   });return rows;
  },
  calculate(basis,extras,ttInput=null){
