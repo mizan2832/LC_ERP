@@ -33,7 +33,7 @@
  const hs=$('hs').closest('label');hs.after(processLabel,componentLabel);fields.push('processType','componentType');
  function normalizedProcess(value){return String(value||'CBU').toUpperCase()==='CKD'?'CKD':'CBU'}
  function normalizedComponent(value){const result=String(value||'').toUpperCase();return ['KIT','CABIN'].includes(result)?result:''}
- function syncComponent(){const isCkd=process.value==='CKD';componentLabel.hidden=!isCkd;component.disabled=!isCkd;component.required=isCkd;if(!isCkd)component.value=''}
+ function syncComponent(){const selected=Boolean($('brandName').value&&$('itemCategory').value&&$('sku').value),vehicle=selected&&$('brandName').value!=='Goodyear'&&$('itemCategory').value!=='Spare parts';if(!vehicle&&process.value!=='CKD')process.value='CBU';processLabel.hidden=!vehicle&&process.value!=='CKD';process.disabled=!vehicle&&process.value!=='CKD';const isCkd=process.value==='CKD';componentLabel.hidden=!isCkd;component.disabled=!isCkd;component.required=isCkd;if(!isCkd)component.value=''}
  function identityChanged(){
   syncComponent();currentSetupNumber='';$('saved').value='';$('version').value='STD-001';showSetupStatus('New');list();calc();
   $('notice').textContent=process.value==='CKD'&&!component.value?'Select KIT or Cabin for this CKD standard cost.':'New '+(process.value==='CKD'?'CKD / '+component.options[component.selectedIndex].text:'CBU')+' costing identity selected. Enter costs or load a matching previous setup.';
@@ -41,9 +41,9 @@
  const baseLoad=loadSetup;
  loadSetup=function(data){const processType=normalizedProcess(data?.fields?.processType),componentType=processType==='CKD'?normalizedComponent(data?.fields?.componentType):'';baseLoad({...data,fields:{...data.fields,processType,componentType}});syncComponent();list()};
  const baseValid=valid;
- valid=function(){if(process.value==='CKD'&&!component.value){$('notice').textContent='Select KIT or Cabin for the CKD standard cost.';component.focus();return false}return baseValid()};
+ valid=function(){if(process.value==='CKD'&&($('brandName').value==='Goodyear'||$('itemCategory').value==='Spare parts')){$('notice').textContent='CKD standard cost applies to vehicles only.';process.focus();return false}if(process.value==='CKD'&&!component.value){$('notice').textContent='Select KIT or Cabin for the CKD standard cost.';component.focus();return false}return baseValid()};
  const baseSaveSetup=saveSetup;
- saveSetup=function(status){if(process.value==='CKD'&&!component.value){$('notice').textContent='Select KIT or Cabin before saving this CKD standard cost.';component.focus();return}return baseSaveSetup(status)};
+ saveSetup=function(status){if(process.value==='CKD'&&($('brandName').value==='Goodyear'||$('itemCategory').value==='Spare parts')){$('notice').textContent='CKD standard cost applies to vehicles only.';process.focus();return}if(process.value==='CKD'&&!component.value){$('notice').textContent='Select KIT or Cabin before saving this CKD standard cost.';component.focus();return}return baseSaveSetup(status)};
  list=function(){
   const select=$('saved'),query=$('search').value.trim().toLowerCase(),selectedProcess=normalizedProcess(process.value),selectedComponent=selectedProcess==='CKD'?normalizedComponent(component.value):'';
   select.replaceChildren(new Option('Select a saved setup...',''));
@@ -59,5 +59,6 @@
  $('new').onclick=()=>{baseNew();process.value='CBU';component.value='';syncComponent();list()};
  process.addEventListener('change',identityChanged);component.addEventListener('change',identityChanged);
  $('productSelect').addEventListener('change',()=>{process.value='CBU';component.value='';syncComponent();list()});
+ $('brandName').addEventListener('change',syncComponent);$('itemCategory').addEventListener('change',syncComponent);
  syncComponent();
 })();
