@@ -5,7 +5,6 @@ const DUTY_HEADS=[
  {id:'vat',name:'VAT',standard:'duty-3',base:'vat'},
  {id:'ait',name:'Advance income tax',standard:'duty-4',base:'av'},
  {id:'at',name:'Advance trade VAT / AT',standard:'duty-5',base:'vat'},
- {id:'psi',name:'PSI commission',match:/\bPSI\b/i,base:'av'},
  {id:'vatcf',name:'VAT on C&F commission',standard:'global-1',base:'cf',processing:true},
  {id:'itcf',name:'Income tax on C&F commission',standard:'global-2',base:'cf',processing:true},
  {id:'doc',name:'Document processing fee',standard:'global-0',base:'av',processing:true},
@@ -18,13 +17,14 @@ const DutyStore={
  key:'lc-duty-calculations-v1',
  heads(basis){
   if(Array.isArray(basis?.processingHeads)){
-   const ids=new Set(basis.processingHeads.map(head=>head.id));return [...DUTY_HEADS.filter(head=>!head.processing&&!ids.has(head.id)),...basis.processingHeads];
+   const processingHeads=basis.processingHeads.filter(head=>head.id!=='psi'&&!/^PSI commission$/i.test(head.name||''));
+   const ids=new Set(processingHeads.map(head=>head.id));return [...DUTY_HEADS.filter(head=>!head.processing&&!ids.has(head.id)),...processingHeads];
   }
   const heads=DUTY_HEADS.map(head=>({...head}));
   let costs=(basis?.rows||[]).flatMap(row=>row.standardSnapshot?.costs||[]);
   if(basis?.includeMasterProcessingHeads){const masters=JSON.parse(localStorage.getItem('lc-standards-v1')||'[]');if(!Array.isArray(masters))throw Error('Invalid standard cost storage.');costs=[...costs,...masters.flatMap(setup=>setup.costs||[])];}
-  costs.filter(cost=>cost.key==='global'&&!/assembl/i.test(cost.name||'')).forEach(cost=>{
-   const key=ExpenseStore.headKey(cost);let head=heads.find(head=>head.standard===cost.id||head.costKey===key||head.processing&&head.name.trim().toLowerCase()===String(cost.name).trim().toLowerCase()||head.id==='psi'&&head.match?.test(cost.name||''));
+  costs.filter(cost=>cost.key==='global'&&!/assembl/i.test(cost.name||'')&&!/^PSI commission$/i.test(cost.name||'')).forEach(cost=>{
+   const key=ExpenseStore.headKey(cost);let head=heads.find(head=>head.standard===cost.id||head.costKey===key||head.processing&&head.name.trim().toLowerCase()===String(cost.name).trim().toLowerCase());
    if(!head){head={id:'processing-'+Array.from(key).map(char=>char.codePointAt(0).toString(16)).join('-'),name:cost.name,base:'av'};heads.push(head)}
    head.processing=true;head.costKey=key;delete head.match;
   });return heads;
